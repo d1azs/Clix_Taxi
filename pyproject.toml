@@ -1,5 +1,5 @@
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "volunteer.settings"
+DJANGO_SETTINGS_MODULE = "clix_backend.settings"
 python_files = ["test_*.py"]
 
 [tool.black]
