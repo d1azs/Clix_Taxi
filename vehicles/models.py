@@ -62,6 +62,7 @@ class Vehicle(models.Model):
     class Meta:
         verbose_name = "Автомобіль"
         verbose_name_plural = "Автомобілі"
+        ordering = ["-id"]
 
     def __str__(self):
         return f"{self.make_model} ({self.license_plate}) — {self.get_vehicle_class_display()}"

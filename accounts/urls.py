@@ -8,6 +8,8 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from . import views
 
+app_name = "accounts"
+
 urlpatterns = [
     # Автентифікація
     path("auth/login/", views.LoginView.as_view(), name="login"),
