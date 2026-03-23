@@ -1,11 +1,14 @@
-import pytest
 from django.urls import reverse
 from django.utils import timezone
+
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
-from accounts.models import User, Role, DriverProfile, DriverStatus
+
+from accounts.models import DriverProfile, DriverStatus, Role, User
 from orders.models import Order, OrderStatus, RequiredClass
 from vehicles.models import Vehicle
+
 
 @pytest.mark.django_db
 class TestOrderCycle:

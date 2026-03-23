@@ -1,9 +1,12 @@
-import pytest
 from django.urls import reverse
+
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
-from accounts.models import User, Role, DriverProfile
+
+from accounts.models import DriverProfile, Role, User
 from vehicles.models import Vehicle
+
 
 @pytest.mark.django_db
 class TestVehicleAPI:
