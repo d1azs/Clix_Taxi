@@ -17,8 +17,12 @@ from accounts.permissions import IsDispatcher, IsDriver, IsPassenger
 from vehicles.models import Vehicle
 
 from .models import Order, OrderStatus, Review
-from .serializers import (DispatcherOrderCreateSerializer, OrderSerializer,
-                          PassengerOrderCreateSerializer, ReviewSerializer)
+from .serializers import (
+    DispatcherOrderCreateSerializer,
+    OrderSerializer,
+    PassengerOrderCreateSerializer,
+    ReviewSerializer,
+)
 
 
 def _calculate_price(
