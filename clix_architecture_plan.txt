@@ -1,0 +1,88 @@
+# Architecture and Implementation Plan for CLIX (Taxi Dispatch System)
+
+Goal: Creation of a centralized CLIX system to automate the work of taxi dispatchers, drivers, and passengers.
+Note: The application interface (UI text) must be implemented in Ukrainian.
+
+## 1. High-Level Architecture
+
+The system is built on a classic client-server architecture using REST API and Real-Time elements.
+
+### 1.1. Backend (Server-side)
+*   Framework: Python 3, Django, Django REST Framework (DRF).
+*   Database: PostgreSQL. Used for reliable data storage, transaction support, and strict locks (select_for_update()) when a driver takes an order to avoid race conditions. The PostGIS extension is recommended for efficient handling of mapping data (fast search for nearby drivers by radius).
+*   Authentication: JWT (JSON Web Tokens) for secure transmission of authorization state. The token will contain an array of user roles.
+*   Real-Time Processing (Optional/Desired): Django Channels (WebSockets) + Redis for transmitting driver location updates in real-time and pushing order status notifications. For the MVP, Short Polling every 5-10 seconds can be used.
+*   Background Processing: Celery + Redis (or RabbitMQ) for asynchronous tasks: sending SMS with OTP, automatically canceling PENDING orders due to timeout, etc.
+
+### 1.2. Frontend (Client-side)
+*   Framework: Flutter (Dart). Ensures cross-platform compatibility (iOS, Android).
+*   Structure (Unified App): A single application. Routing and UI elements are based on the active role (RBAC). The active role state is managed globally (using BLoC or Riverpod), allowing the user to instantly switch interfaces.
+*   Mapping: Google Maps SDK for Flutter. Responsible for displaying the map, markers (online cars, pick-up/drop-off points) and building routes (Directions API).
+*   Network Requests: "dio" package for interacting with the REST API. Setup interceptors to automatically add JWT tokens to headers (Authorization: Bearer <token>) and handle 401 errors for token refresh.
+*   App Language: UI text and copy must be in Ukrainian (e.g., "Куди їдемо?", "Вхід", "Підтвердження", "Прийняти", "Відхилити").
+
+## 2. UI/UX Specification (Based on References)
+
+*   Theme: Light theme as the base. Dark map (Dark Map Style in Google Maps) for contrast during calls, with a deep purple accent (#4F46E5 or #5E48E8).
+*   Typography: Clean sans-serif (Inter or SF Pro Display) with large headings.
+*   Shapes: Smooth corner radii (border-radius: 12-16px) for cards (Bottom Sheets), buttons, and input fields (especially OTP in separate squares).
+*   Layout: The map takes up ~80% of the screen; all controls (comfort/economy car class selection, driver status control buttons) appear from the bottom as Bottom Sheets.
+
+## 3. Step-by-Step Implementation Plan
+
+The development is divided into logical phases.
+
+### Phase 1: Infrastructure Creation (Project Setup)
+1.  Initialize repositories for Backend and Frontend.
+2.  Set up the Django environment, connect PostgreSQL (initialize PostGIS) and Redis.
+3.  Set up the JWT mechanism (djangorestframework-simplejwt).
+4.  Initialize the Flutter project, set up vectors, and integrate Google Maps SDK (API keys for Android/iOS).
+
+### Phase 2: Database and Authentication (Backend)
+1.  Create a custom "User" model with a "phone_number" field and "roles" (via ArrayField or M2M).
+2.  Create "DriverProfile", "Vehicle", and "Review" models.
+3.  Implement endpoints: POST /api/auth/login/ (with SMS code generation in console/service) and GET /api/users/me/.
+4.  Create custom DRF Permission classes (IsPassenger, IsDriver, IsDispatcher).
+
+### Phase 3: Core API for Orders (Backend)
+1.  Create an "Order" model with geo-fields (lat/lng) and trip statuses.
+2.  Passenger: Implement endpoints for order creation (POST /api/passenger/orders/) and tracking (GET /api/passenger/orders/active/).
+3.  Driver:
+    *   Implement Locator API ("Radar"): GET /api/orders/available/, returning only PENDING orders that match the driver's "vehicle_class" within an N km radius.
+    *   Implement Order Acceptance API: POST /api/orders/{id}/accept/. Critical: Use select_for_update() in a transaction to lock the order row while checking and changing its status to ACCEPTED/EN_ROUTE.
+    *   Implement Status Change API: PATCH /api/orders/{id}/status/.
+
+### Phase 4: Dispatcher API and Additional Functionality
+1.  Implement endpoints for the dispatcher: POST /api/dispatcher/orders/ (order creation from admin panel), monitoring.
+2.  Implement Reviews API: POST /api/orders/{id}/review/ and Complaints API GET /api/dispatcher/complaints/.
+3.  Set up History model GET /api/orders/history/.
+
+### Phase 5: Interface Development (Frontend - Base and Login)
+1.  Implement client design system: colors, typography, basic button widgets, and text fields.
+2.  Layout Login screens: Phone input (with CZ flag +420) and Confirmation screen (OTP input with resend timer).
+3.  Set up Secure Storage for JWT and create a role switcher screen: "Я пасажир / Я водій" (displayed only if "roles" contains both values).
+
+### Phase 6: Core Passenger UI/UX (Frontend)
+1.  Integrate Google Maps on the main screen: display current location.
+2.  Implement address search (Google Places Autocomplete API) "Куди їдемо?".
+3.  Layout Bottom Sheet with a slider to select car class (Економ: 140 Kč, Комфорт: 180 Kč) and a "Викликати таксі" button.
+4.  Create the waiting flow (drawing driver-to-passenger route line and card with driver details: photo, name, license plate).
+5.  Rating screen: 5 stars and TextField for comment after COMPLETED status.
+
+### Phase 7: Core Driver UI/UX (Frontend)
+1.  Switcher screen "Ви офлайн / Ви онлайн" (sending a request to the server to update "status").
+2.  Display earnings statistics and number of trips on the Dashboard screen.
+3.  "Radar" interface - display incoming order as a pulsating circle (like in the reference) with sound.
+4.  Buttons "Прийняти" (green) / "Відхилити" (red).
+5.  Active trip mode: building a route (Polyline) to the client, then to the Drop-off point, status change buttons ("В дорозі", "Прибув", "Завершити").
+
+### Phase 8: Real-time Synchronization Implementation (Finalization)
+1.  Set up background sending of driver's GPS coordinates to the backend (every 5-10 seconds).
+2.  Display updated car markers on the passenger's map.
+3.  Integrate Firebase Cloud Messaging (FCM) for push notifications ("Нове замовлення у вашому радіусі", "Водій очікує").
+
+### Phase 9: QA, Testing, and Release
+1.  Unit/Integration testing of critical nodes (e.g., checking select_for_update()).
+2.  Deploy Backend (Docker, Nginx, Gunicorn) on server infrastructure.
+3.  Test database migrations.
+4.  Package Flutter application and publish to App Store / Google Play.

@@ -1,0 +1,102 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Пасажир" as Passenger
+actor "Водій" as Driver
+
+rectangle "Додаток CLIX" {
+    
+    ' Спільне
+    usecase "Авторизація за номером телефону" as UC_Auth
+    usecase "Реєстрація акаунта" as UC_Register
+    usecase "Перегляд історії поїздок" as UC_History
+
+    ' Пасажир
+    usecase "Створення замовлення" as UC_CreateOrder
+    usecase "Встановлення точки відправлення (Звідки)" as UC_SetPickup
+    usecase "Встановлення точки призначення (Куди)" as UC_SetDropoff
+    usecase "Вибір класу авто (Economy/Comfort/Business)" as UC_CarClass
+    usecase "Використання поточної геолокації" as UC_UseLocation
+
+    usecase "Відстеження статусу поїздки" as UC_TrackStatus
+    usecase "Перегляд локації водія на карті" as UC_ViewDriverLoc
+    usecase "Перегляд промальованого маршруту" as UC_ViewRoute
+
+    usecase "Завершення поїздки" as UC_FinishTripPassenger
+    usecase "Оцінка водія (1-5 зірок)" as UC_RateDriver
+    usecase "Написання текстового відгуку" as UC_TextReview
+    usecase "Відправлення скарги" as UC_Complaint
+
+    usecase "Скасування замовлення" as UC_CancelOrder
+
+    ' Водій
+    usecase "Зміна робочого статусу (Онлайн / Офлайн)" as UC_ChangeStatus
+    usecase "Пошук замовлень (Радар)" as UC_SearchOrders
+    usecase "Прийняття замовлення" as UC_AcceptOrder
+
+    usecase "Обслуговування прийнятого замовлення" as UC_ServiceOrder
+    usecase "Перегляд маршруту та навігація до пасажира" as UC_NavToPassenger
+    usecase "Зміна статусу на \"Прибув\"" as UC_StatusArrived
+    usecase "Зміна статусу на \"В дорозі\"" as UC_StatusInProgress
+    usecase "Зміна статусу на \"Завершено\"" as UC_StatusCompleted
+    usecase "Навігація за маршрутом до точки призначення" as UC_NavToDropoff
+
+    usecase "Перегляд водійської статистики" as UC_ViewStats
+    usecase "Перегляд поточного рейтингу" as UC_ViewRating
+    usecase "Перегляд заробітку за день" as UC_ViewEarnings
+}
+
+' --- ЗВ'ЯЗКИ АКТОРІВ З БАЗОВИМИ USE CASES ---
+
+' Пасажир
+Passenger --> UC_Auth
+Passenger --> UC_CreateOrder
+Passenger --> UC_TrackStatus
+Passenger --> UC_FinishTripPassenger
+Passenger --> UC_CancelOrder
+Passenger --> UC_History
+
+' Водій
+Driver --> UC_Auth
+Driver --> UC_ChangeStatus
+Driver --> UC_SearchOrders
+Driver --> UC_ServiceOrder
+Driver --> UC_ViewStats
+Driver --> UC_History
+
+' --- INCLUDE та EXTEND зв'язки ---
+
+' Авторизація
+UC_Register .> UC_Auth : <<extend>>
+
+' Створення замовлення (Пасажир)
+UC_CreateOrder ..> UC_SetPickup : <<include>>
+UC_CreateOrder ..> UC_SetDropoff : <<include>>
+UC_CreateOrder ..> UC_CarClass : <<include>>
+UC_UseLocation .> UC_SetPickup : <<extend>>
+
+' Відстеження (Пасажир)
+UC_TrackStatus ..> UC_ViewDriverLoc : <<include>>
+UC_TrackStatus ..> UC_ViewRoute : <<include>>
+
+' Завершення поїздки (Пасажир)
+UC_FinishTripPassenger ..> UC_RateDriver : <<include>>
+UC_TextReview .> UC_RateDriver : <<extend>>
+UC_Complaint .> UC_RateDriver : <<extend>>
+
+' Робота із замовленнями (Водій)
+UC_AcceptOrder .> UC_SearchOrders : <<extend>>
+
+' Обслуговування замовлення (Водій)
+UC_ServiceOrder ..> UC_NavToPassenger : <<include>>
+UC_ServiceOrder ..> UC_StatusArrived : <<include>>
+UC_ServiceOrder ..> UC_StatusInProgress : <<include>>
+UC_ServiceOrder ..> UC_StatusCompleted : <<include>>
+UC_NavToDropoff .> UC_ServiceOrder : <<extend>>
+
+' Статистика (Водій)
+UC_ViewStats ..> UC_ViewRating : <<include>>
+UC_ViewStats ..> UC_ViewEarnings : <<include>>
+
+@enduml
