@@ -10,12 +10,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import DriverProfile, DriverStatus, User
 from .permissions import IsDriver
-from .serializers import (
-    CLIXTokenObtainPairSerializer,
-    DriverProfileSerializer,
-    RegisterSerializer,
-    UserSerializer,
-)
+from .serializers import (CLIXTokenObtainPairSerializer,
+                          DriverProfileSerializer, RegisterSerializer,
+                          UserSerializer)
 
 
 # ---------------------------------------------------------------------------
