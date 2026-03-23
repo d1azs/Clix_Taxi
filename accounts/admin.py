@@ -4,7 +4,8 @@ accounts/admin.py — Реєстрація моделей у Django Admin.
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, DriverProfile
+
+from .models import DriverProfile, User
 
 
 @admin.register(User)

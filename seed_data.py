@@ -4,15 +4,17 @@
 """
 
 import os
+
 import django
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "clix_backend.settings")
 django.setup()
 
-from accounts.models import User, DriverProfile
-from vehicles.models import Vehicle
-from orders.models import Order, OrderStatus
 from django.utils import timezone
+
+from accounts.models import DriverProfile, User
+from orders.models import Order, OrderStatus
+from vehicles.models import Vehicle
 
 print("=" * 60)
 print("  CLIX — Створення тестових даних")

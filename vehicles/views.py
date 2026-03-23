@@ -3,7 +3,9 @@ vehicles/views.py — Views для управління автомобілями
 """
 
 from rest_framework import generics
+
 from accounts.permissions import IsDriver
+
 from .models import Vehicle
 from .serializers import VehicleSerializer
 

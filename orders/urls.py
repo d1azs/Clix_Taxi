@@ -3,6 +3,7 @@ orders/urls.py — URL-маршрути для замовлень.
 """
 
 from django.urls import path
+
 from . import views
 
 urlpatterns = [

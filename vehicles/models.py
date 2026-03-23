@@ -3,7 +3,9 @@ vehicles/models.py — Модель автомобіля водія.
 """
 
 import uuid
+
 from django.db import models
+
 from accounts.models import DriverProfile
 
 

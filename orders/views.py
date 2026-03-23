@@ -2,26 +2,23 @@
 orders/views.py — Views для замовлень: пасажир, водій, диспетчер.
 """
 
+import math
+
 from django.db import transaction
-from django.db.models import Q, Avg
+from django.db.models import Avg, Q
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import User, DriverProfile, DriverStatus
-from accounts.permissions import IsPassenger, IsDriver, IsDispatcher
+from accounts.models import DriverProfile, DriverStatus, User
+from accounts.permissions import IsDispatcher, IsDriver, IsPassenger
 from vehicles.models import Vehicle
-from .models import Order, OrderStatus, Review
-from .serializers import (
-    OrderSerializer,
-    PassengerOrderCreateSerializer,
-    DispatcherOrderCreateSerializer,
-    ReviewSerializer,
-)
 
-import math
+from .models import Order, OrderStatus, Review
+from .serializers import (DispatcherOrderCreateSerializer, OrderSerializer,
+                          PassengerOrderCreateSerializer, ReviewSerializer)
 
 
 def _calculate_price(

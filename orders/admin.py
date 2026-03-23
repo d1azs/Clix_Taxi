@@ -3,6 +3,7 @@ orders/admin.py — Реєстрація моделей у Django Admin.
 """
 
 from django.contrib import admin
+
 from .models import Order, Review
 
 

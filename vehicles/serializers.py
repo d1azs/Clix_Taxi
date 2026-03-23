@@ -3,6 +3,7 @@ vehicles/serializers.py — Серіалайзери для автомобілі
 """
 
 from rest_framework import serializers
+
 from .models import Vehicle
 
 

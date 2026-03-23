@@ -4,7 +4,8 @@ accounts/serializers.py — Серіалайзери для аутентифік
 
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import User, DriverProfile
+
+from .models import DriverProfile, User
 
 
 # ---------------------------------------------------------------------------

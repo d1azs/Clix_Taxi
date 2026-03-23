@@ -3,8 +3,10 @@ orders/models.py — Моделі замовлень, відгуків та ск
 """
 
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
+
 from accounts.models import DriverProfile
 
 
