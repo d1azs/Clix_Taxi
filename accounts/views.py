@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import DriverProfile, DriverStatus, User
+from .models import DriverStatus, User
 from .permissions import IsDriver
 from .serializers import (
     CLIXTokenObtainPairSerializer,

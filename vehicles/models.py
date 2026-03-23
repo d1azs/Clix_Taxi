@@ -65,4 +65,5 @@ class Vehicle(models.Model):
         ordering = ["-id"]
 
     def __str__(self):
-        return f"{self.make_model} ({self.license_plate}) — {self.get_vehicle_class_display()}"
+        desc = f"{self.make_model} ({self.license_plate})"
+        return f"{desc} — {self.get_vehicle_class_display()}"

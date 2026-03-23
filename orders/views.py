@@ -5,7 +5,7 @@ orders/views.py — Views для замовлень: пасажир, водій,
 import math
 
 from django.db import transaction
-from django.db.models import Avg, Q
+from django.db.models import Avg
 from django.utils import timezone
 
 from rest_framework import generics, status
@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import DriverProfile, DriverStatus, User
+from accounts.models import DriverStatus, User
 from accounts.permissions import IsDispatcher, IsDriver, IsPassenger
 from vehicles.models import Vehicle
 
@@ -434,7 +434,7 @@ class CreateReviewView(generics.CreateAPIView):
 
             raise ValidationError("Замовлення не знайдено або ще не завершено")
 
-        review = serializer.save(
+        serializer.save(
             order=order,
             author=self.request.user,
             target_driver=order.driver,

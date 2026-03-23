@@ -67,7 +67,7 @@ driver_profile, created = DriverProfile.objects.get_or_create(
     },
 )
 if created:
-    print(f"✅ Профіль водія створений")
+    print("✅ Профіль водія створений")
 
 # Мульти-роль (Пасажир + Водій)
 multi_user, created = User.objects.get_or_create(
