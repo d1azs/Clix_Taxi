@@ -13,6 +13,7 @@ class VehicleListCreateView(generics.ListCreateAPIView):
     GET  /api/driver/vehicles/ — Список автомобілів поточного водія.
     POST /api/driver/vehicles/ — Додати новий автомобіль.
     """
+
     serializer_class = VehicleSerializer
     permission_classes = [IsDriver]
 
@@ -27,6 +28,7 @@ class VehicleDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     GET/PUT/PATCH/DELETE /api/driver/vehicles/<id>/ — Деталі автомобіля.
     """
+
     serializer_class = VehicleSerializer
     permission_classes = [IsDriver]
 

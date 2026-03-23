@@ -23,6 +23,7 @@ from .permissions import IsDriver
 # ---------------------------------------------------------------------------
 class LoginView(TokenObtainPairView):
     """POST /api/auth/login/ — JWT логін з ролями у відповіді."""
+
     serializer_class = CLIXTokenObtainPairSerializer
 
 
@@ -31,6 +32,7 @@ class LoginView(TokenObtainPairView):
 # ---------------------------------------------------------------------------
 class RegisterView(generics.CreateAPIView):
     """POST /api/auth/register/ — Реєстрація нового користувача."""
+
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
@@ -41,6 +43,7 @@ class RegisterView(generics.CreateAPIView):
 # ---------------------------------------------------------------------------
 class MeView(generics.RetrieveAPIView):
     """GET /api/users/me/ — Данi поточного користувача."""
+
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
@@ -53,6 +56,7 @@ class MeView(generics.RetrieveAPIView):
 # ---------------------------------------------------------------------------
 class DriverStatusView(APIView):
     """PATCH /api/driver/status/ — Зміна статусу водія."""
+
     permission_classes = [IsDriver]
 
     def get(self, request):
@@ -61,17 +65,17 @@ class DriverStatusView(APIView):
 
     def patch(self, request):
         profile = request.user.driver_profile
-        new_status = request.data.get('status')
+        new_status = request.data.get("status")
         if new_status not in [DriverStatus.ONLINE, DriverStatus.OFFLINE]:
             return Response(
-                {'error': 'Допустимі статуси: ONLINE, OFFLINE'},
+                {"error": "Допустимі статуси: ONLINE, OFFLINE"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         profile.status = new_status
         # Оновити координати, якщо водій виходить онлайн
         if new_status == DriverStatus.ONLINE:
-            profile.current_lat = request.data.get('lat', profile.current_lat)
-            profile.current_lng = request.data.get('lng', profile.current_lng)
+            profile.current_lat = request.data.get("lat", profile.current_lat)
+            profile.current_lng = request.data.get("lng", profile.current_lng)
         profile.save()
         return Response(DriverProfileSerializer(profile).data)
 
@@ -81,18 +85,19 @@ class DriverStatusView(APIView):
 # ---------------------------------------------------------------------------
 class DriverLocationUpdateView(APIView):
     """POST /api/driver/location/ — Оновлення GPS-координат водія."""
+
     permission_classes = [IsDriver]
 
     def post(self, request):
         profile = request.user.driver_profile
-        lat = request.data.get('lat')
-        lng = request.data.get('lng')
+        lat = request.data.get("lat")
+        lng = request.data.get("lng")
         if lat is None or lng is None:
             return Response(
-                {'error': 'Необхідні поля: lat, lng'},
+                {"error": "Необхідні поля: lat, lng"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         profile.current_lat = float(lat)
         profile.current_lng = float(lng)
-        profile.save(update_fields=['current_lat', 'current_lng'])
-        return Response({'status': 'ok'})
+        profile.save(update_fields=["current_lat", "current_lng"])
+        return Response({"status": "ok"})

@@ -23,13 +23,19 @@ from .serializers import (
 
 import math
 
-def _calculate_price(pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, required_class='ECONOMY'):
+
+def _calculate_price(
+    pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, required_class="ECONOMY"
+):
     """Розрахунок ціни на основі відстані (Haversine) та класу авто."""
     R = 6371  # Радіус Землі, км
     lat1, lat2 = math.radians(pickup_lat), math.radians(dropoff_lat)
     dlat = math.radians(dropoff_lat - pickup_lat)
     dlng = math.radians(dropoff_lng - pickup_lng)
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlng / 2) ** 2
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlng / 2) ** 2
+    )
     distance_km = R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
     # Базова ціна: 45₴ + 12₴/км
@@ -37,10 +43,10 @@ def _calculate_price(pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, required_
 
     # Множники класів
     multipliers = {
-        'ECONOMY': 1.0,
-        'PREMIUM': 1.4,
-        'BUSINESS': 1.8,
-        'MINIVAN': 1.5,
+        "ECONOMY": 1.0,
+        "PREMIUM": 1.4,
+        "BUSINESS": 1.8,
+        "MINIVAN": 1.5,
     }
     multiplier = multipliers.get(required_class, 1.0)
     price = round(base * multiplier, 2)
@@ -51,10 +57,12 @@ def _calculate_price(pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, required_
 # ║                        ПАСАЖИР (Passenger)                            ║
 # ╚═════════════════════════════════════════════════════════════════════════╝
 
+
 class PassengerOrderCreateView(generics.CreateAPIView):
     """
     POST /api/passenger/orders/ — Пасажир створює замовлення.
     """
+
     serializer_class = PassengerOrderCreateSerializer
     permission_classes = [IsPassenger]
 
@@ -62,17 +70,20 @@ class PassengerOrderCreateView(generics.CreateAPIView):
         order = serializer.save(passenger=self.request.user, status=OrderStatus.PENDING)
         if not order.estimated_price:
             order.estimated_price = _calculate_price(
-                order.pickup_lat, order.pickup_lng,
-                order.dropoff_lat, order.dropoff_lng,
+                order.pickup_lat,
+                order.pickup_lng,
+                order.dropoff_lat,
+                order.dropoff_lng,
                 order.required_class,
             )
-            order.save(update_fields=['estimated_price'])
+            order.save(update_fields=["estimated_price"])
 
 
 class PassengerActiveOrderView(APIView):
     """
     GET /api/passenger/orders/active/ — Поточне активне замовлення пасажира.
     """
+
     permission_classes = [IsPassenger]
 
     def get(self, request):
@@ -83,18 +94,21 @@ class PassengerActiveOrderView(APIView):
             OrderStatus.IN_PROGRESS,
             OrderStatus.COMPLETED,
         ]
-        
-        order = Order.objects.filter(
-            passenger=request.user,
-            status__in=active_statuses,
-        ).exclude(
-            status=OrderStatus.COMPLETED,
-            review__isnull=False
-        ).select_related('driver', 'driver__user').order_by('-created_at').first()
+
+        order = (
+            Order.objects.filter(
+                passenger=request.user,
+                status__in=active_statuses,
+            )
+            .exclude(status=OrderStatus.COMPLETED, review__isnull=False)
+            .select_related("driver", "driver__user")
+            .order_by("-created_at")
+            .first()
+        )
 
         if not order:
             return Response(
-                {'detail': 'Немає активних замовлень'},
+                {"detail": "Немає активних замовлень"},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(OrderSerializer(order).data)
@@ -104,11 +118,13 @@ class PassengerActiveOrderView(APIView):
 # ║                          ВОДІЙ (Driver)                               ║
 # ╚═════════════════════════════════════════════════════════════════════════╝
 
+
 class DriverActiveOrderView(APIView):
     """
     GET /api/driver/orders/active/ — Поточне активне замовлення водія.
     Повертає замовлення зі статусом ACCEPTED, EN_ROUTE або IN_PROGRESS.
     """
+
     permission_classes = [IsDriver]
 
     def get(self, request):
@@ -118,14 +134,18 @@ class DriverActiveOrderView(APIView):
             OrderStatus.IN_PROGRESS,
         ]
         driver_profile = request.user.driver_profile
-        order = Order.objects.filter(
-            driver=driver_profile,
-            status__in=active_statuses,
-        ).select_related('passenger', 'driver', 'driver__user').first()
+        order = (
+            Order.objects.filter(
+                driver=driver_profile,
+                status__in=active_statuses,
+            )
+            .select_related("passenger", "driver", "driver__user")
+            .first()
+        )
 
         if not order:
             return Response(
-                {'detail': 'Немає активних замовлень'},
+                {"detail": "Немає активних замовлень"},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(OrderSerializer(order).data)
@@ -136,6 +156,7 @@ class AvailableOrdersView(generics.ListAPIView):
     GET /api/orders/available/ — Радар: доступні PENDING-замовлення для водія.
     Фільтрує за класом авто та опціями водія.
     """
+
     serializer_class = OrderSerializer
     permission_classes = [IsDriver]
 
@@ -150,7 +171,7 @@ class AvailableOrdersView(generics.ListAPIView):
 
         # Збираємо доступні класи та опції
         available_classes = list(
-            driver_vehicles.values_list('vehicle_class', flat=True).distinct()
+            driver_vehicles.values_list("vehicle_class", flat=True).distinct()
         )
         has_pet = driver_vehicles.filter(is_pet_friendly=True).exists()
         has_child = driver_vehicles.filter(has_child_seat=True).exists()
@@ -169,7 +190,7 @@ class AvailableOrdersView(generics.ListAPIView):
         if not has_wheelchair:
             qs = qs.exclude(needs_wheelchair_access=True)
 
-        return qs.order_by('created_at')
+        return qs.order_by("created_at")
 
 
 class AcceptOrderView(APIView):
@@ -177,6 +198,7 @@ class AcceptOrderView(APIView):
     POST /api/orders/<id>/accept/ — Водій приймає замовлення.
     Критичний ендпоінт: використовує select_for_update() для уникнення race conditions.
     """
+
     permission_classes = [IsDriver]
 
     def post(self, request, pk):
@@ -185,17 +207,15 @@ class AcceptOrderView(APIView):
         # Перевіряємо, чи водій онлайн
         if driver_profile.status != DriverStatus.ONLINE:
             return Response(
-                {'error': 'Спочатку перейдіть в режим ONLINE'},
+                {"error": "Спочатку перейдіть в режим ONLINE"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             with transaction.atomic():
                 # Блокуємо рядок замовлення — інші водії зачекають
-                order = (
-                    Order.objects
-                    .select_for_update()
-                    .get(pk=pk, status=OrderStatus.PENDING)
+                order = Order.objects.select_for_update().get(
+                    pk=pk, status=OrderStatus.PENDING
                 )
                 order.status = OrderStatus.ACCEPTED
                 order.driver = driver_profile
@@ -203,7 +223,7 @@ class AcceptOrderView(APIView):
                 order.save()
         except Order.DoesNotExist:
             return Response(
-                {'error': 'Замовлення вже прийняте або не існує'},
+                {"error": "Замовлення вже прийняте або не існує"},
                 status=status.HTTP_409_CONFLICT,
             )
 
@@ -215,22 +235,25 @@ class RejectOrderView(APIView):
     POST /api/orders/<id>/reject/ — Водій відмовляється від замовлення.
     Повертає статус у PENDING.
     """
+
     permission_classes = [IsDriver]
 
     def post(self, request, pk):
         driver_profile = request.user.driver_profile
         try:
-            order = Order.objects.get(pk=pk, driver=driver_profile, status=OrderStatus.ACCEPTED)
+            order = Order.objects.get(
+                pk=pk, driver=driver_profile, status=OrderStatus.ACCEPTED
+            )
         except Order.DoesNotExist:
             return Response(
-                {'error': 'Замовлення не знайдено або ви не можете його відхилити'},
+                {"error": "Замовлення не знайдено або ви не можете його відхилити"},
                 status=status.HTTP_404_NOT_FOUND,
             )
         order.status = OrderStatus.PENDING
         order.driver = None
         order.accepted_at = None
         order.save()
-        return Response({'detail': 'Замовлення повернуто в чергу'})
+        return Response({"detail": "Замовлення повернуто в чергу"})
 
 
 class UpdateOrderStatusView(APIView):
@@ -239,6 +262,7 @@ class UpdateOrderStatusView(APIView):
     Допустимі переходи:
       ACCEPTED → EN_ROUTE → IN_PROGRESS → COMPLETED
     """
+
     permission_classes = [IsDriver]
 
     # Допустимі переходи статусів
@@ -250,20 +274,20 @@ class UpdateOrderStatusView(APIView):
 
     def patch(self, request, pk):
         driver_profile = request.user.driver_profile
-        new_status = request.data.get('status')
+        new_status = request.data.get("status")
 
         try:
             order = Order.objects.get(pk=pk, driver=driver_profile)
         except Order.DoesNotExist:
             return Response(
-                {'error': 'Замовлення не знайдено'},
+                {"error": "Замовлення не знайдено"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         expected_next = self.TRANSITIONS.get(order.status)
         if not expected_next or new_status != expected_next:
             return Response(
-                {'error': f'Неможливий перехід: {order.status} → {new_status}'},
+                {"error": f"Неможливий перехід: {order.status} → {new_status}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -284,15 +308,17 @@ class UpdateOrderStatusView(APIView):
 # ║                       ДИСПЕТЧЕР (Dispatcher)                          ║
 # ╚═════════════════════════════════════════════════════════════════════════╝
 
+
 class DispatcherOrderCreateView(generics.CreateAPIView):
     """
     POST /api/dispatcher/orders/ — Диспетчер створює замовлення від імені клієнта.
     """
+
     serializer_class = DispatcherOrderCreateSerializer
     permission_classes = [IsDispatcher]
 
     def perform_create(self, serializer):
-        phone = serializer.validated_data.pop('passenger_phone', None)
+        phone = serializer.validated_data.pop("passenger_phone", None)
         passenger = None
         if phone:
             passenger = User.objects.filter(phone_number=phone).first()
@@ -303,29 +329,33 @@ class DispatcherOrderCreateView(generics.CreateAPIView):
         )
         if not order.estimated_price:
             order.estimated_price = _calculate_price(
-                order.pickup_lat, order.pickup_lng,
-                order.dropoff_lat, order.dropoff_lng,
+                order.pickup_lat,
+                order.pickup_lng,
+                order.dropoff_lat,
+                order.dropoff_lng,
                 order.required_class,
             )
-            order.save(update_fields=['estimated_price'])
+            order.save(update_fields=["estimated_price"])
 
 
 class DispatcherOrderListView(generics.ListAPIView):
     """
     GET /api/dispatcher/orders/ — Моніторинг всіх замовлень для диспетчера.
     """
+
     serializer_class = OrderSerializer
     permission_classes = [IsDispatcher]
-    filterset_fields = ['status', 'required_class']
+    filterset_fields = ["status", "required_class"]
 
     def get_queryset(self):
-        return Order.objects.all().select_related('driver', 'driver__user', 'passenger')
+        return Order.objects.all().select_related("driver", "driver__user", "passenger")
 
 
 class DispatcherOrderDetailView(generics.RetrieveUpdateAPIView):
     """
     GET/PATCH /api/dispatcher/orders/<id>/ — Деталі / редагування / скасування.
     """
+
     serializer_class = OrderSerializer
     permission_classes = [IsDispatcher]
 
@@ -334,7 +364,7 @@ class DispatcherOrderDetailView(generics.RetrieveUpdateAPIView):
 
     def perform_update(self, serializer):
         # Дозволяємо диспетчеру скасувати замовлення
-        new_status = self.request.data.get('status')
+        new_status = self.request.data.get("status")
         if new_status == OrderStatus.CANCELLED:
             serializer.save(status=OrderStatus.CANCELLED)
         else:
@@ -345,12 +375,13 @@ class DispatcherComplaintsView(generics.ListAPIView):
     """
     GET /api/dispatcher/complaints/ — Перегляд скарг (is_complaint=True).
     """
+
     serializer_class = ReviewSerializer
     permission_classes = [IsDispatcher]
 
     def get_queryset(self):
         return Review.objects.filter(is_complaint=True).select_related(
-            'order', 'author', 'target_driver'
+            "order", "author", "target_driver"
         )
 
 
@@ -358,11 +389,13 @@ class DispatcherComplaintsView(generics.ListAPIView):
 # ║                       СПІЛЬНЕ (Shared)                                ║
 # ╚═════════════════════════════════════════════════════════════════════════╝
 
+
 class OrderHistoryView(generics.ListAPIView):
     """
     GET /api/orders/history/ — Історія завершених/скасованих замовлень.
     Результат залежить від ролі користувача.
     """
+
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
@@ -370,27 +403,24 @@ class OrderHistoryView(generics.ListAPIView):
         user = self.request.user
         finished = [OrderStatus.COMPLETED, OrderStatus.CANCELLED]
 
-        if user.has_role('DISPATCHER'):
+        if user.has_role("DISPATCHER"):
             return Order.objects.filter(status__in=finished)
-        elif user.has_role('DRIVER'):
-            return Order.objects.filter(
-                driver=user.driver_profile, status__in=finished
-            )
+        elif user.has_role("DRIVER"):
+            return Order.objects.filter(driver=user.driver_profile, status__in=finished)
         else:  # PASSENGER
-            return Order.objects.filter(
-                passenger=user, status__in=finished
-            )
+            return Order.objects.filter(passenger=user, status__in=finished)
 
 
 class CreateReviewView(generics.CreateAPIView):
     """
     POST /api/orders/<id>/review/ — Пасажир залишає відгук (або скаргу).
     """
+
     serializer_class = ReviewSerializer
     permission_classes = [IsPassenger]
 
     def perform_create(self, serializer):
-        order_id = self.kwargs['pk']
+        order_id = self.kwargs["pk"]
         try:
             order = Order.objects.get(
                 pk=order_id,
@@ -399,7 +429,8 @@ class CreateReviewView(generics.CreateAPIView):
             )
         except Order.DoesNotExist:
             from rest_framework.exceptions import ValidationError
-            raise ValidationError('Замовлення не знайдено або ще не завершено')
+
+            raise ValidationError("Замовлення не знайдено або ще не завершено")
 
         review = serializer.save(
             order=order,
@@ -410,8 +441,8 @@ class CreateReviewView(generics.CreateAPIView):
         # Перерахунок середнього рейтингу водія
         driver = order.driver
         avg = Review.objects.filter(target_driver=driver).aggregate(
-            avg_rating=Avg('rating')
-        )['avg_rating']
+            avg_rating=Avg("rating")
+        )["avg_rating"]
         if avg:
             driver.rating = round(avg, 2)
-            driver.save(update_fields=['rating'])
+            driver.save(update_fields=["rating"])

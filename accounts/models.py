@@ -3,7 +3,11 @@ accounts/models.py — Кастомна модель User та DriverProfile.
 """
 
 import uuid
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    BaseUserManager,
+    PermissionsMixin,
+)
 from django.db import models
 
 
@@ -11,9 +15,9 @@ from django.db import models
 # Константи ролей
 # ---------------------------------------------------------------------------
 class Role(models.TextChoices):
-    PASSENGER = 'PASSENGER', 'Пасажир'
-    DRIVER = 'DRIVER', 'Водій'
-    DISPATCHER = 'DISPATCHER', 'Диспетчер'
+    PASSENGER = "PASSENGER", "Пасажир"
+    DRIVER = "DRIVER", "Водій"
+    DISPATCHER = "DISPATCHER", "Диспетчер"
 
 
 # ---------------------------------------------------------------------------
@@ -34,8 +38,8 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, phone_number, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
         return self.create_user(phone_number, password, **extra_fields)
 
 
@@ -49,15 +53,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     phone_number = models.CharField(
         max_length=20,
         unique=True,
-        verbose_name='Номер телефону',
-        help_text='Формат: +420XXXXXXXXX',
+        verbose_name="Номер телефону",
+        help_text="Формат: +420XXXXXXXXX",
     )
     first_name = models.CharField(max_length=100, blank=True, verbose_name="Ім'я")
-    last_name = models.CharField(max_length=100, blank=True, verbose_name='Прізвище')
+    last_name = models.CharField(max_length=100, blank=True, verbose_name="Прізвище")
     roles = models.JSONField(
         default=list,
-        verbose_name='Ролі',
-        help_text='Масив ролей: PASSENGER, DRIVER, DISPATCHER',
+        verbose_name="Ролі",
+        help_text="Масив ролей: PASSENGER, DRIVER, DISPATCHER",
     )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -65,12 +69,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = UserManager()
 
-    USERNAME_FIELD = 'phone_number'
+    USERNAME_FIELD = "phone_number"
     REQUIRED_FIELDS = []
 
     class Meta:
-        verbose_name = 'Користувач'
-        verbose_name_plural = 'Користувачі'
+        verbose_name = "Користувач"
+        verbose_name_plural = "Користувачі"
 
     def __str__(self):
         return f'{self.phone_number} ({", ".join(self.roles)})'
@@ -96,8 +100,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 # Статус водія
 # ---------------------------------------------------------------------------
 class DriverStatus(models.TextChoices):
-    ONLINE = 'ONLINE', 'Онлайн'
-    OFFLINE = 'OFFLINE', 'Офлайн'
+    ONLINE = "ONLINE", "Онлайн"
+    OFFLINE = "OFFLINE", "Офлайн"
 
 
 # ---------------------------------------------------------------------------
@@ -110,35 +114,37 @@ class DriverProfile(models.Model):
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
-        related_name='driver_profile',
-        verbose_name='Користувач',
+        related_name="driver_profile",
+        verbose_name="Користувач",
     )
     status = models.CharField(
         max_length=10,
         choices=DriverStatus.choices,
         default=DriverStatus.OFFLINE,
-        verbose_name='Статус',
+        verbose_name="Статус",
     )
     rating = models.DecimalField(
         max_digits=3,
         decimal_places=2,
         default=5.00,
-        verbose_name='Рейтинг',
+        verbose_name="Рейтинг",
     )
-    total_trips = models.PositiveIntegerField(default=0, verbose_name='Кількість поїздок')
+    total_trips = models.PositiveIntegerField(
+        default=0, verbose_name="Кількість поїздок"
+    )
     total_earnings = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0.00,
-        verbose_name='Загальний заробіток (Kč)',
+        verbose_name="Загальний заробіток (Kč)",
     )
     # Поточна геолокація водія
-    current_lat = models.FloatField(null=True, blank=True, verbose_name='Широта')
-    current_lng = models.FloatField(null=True, blank=True, verbose_name='Довгота')
+    current_lat = models.FloatField(null=True, blank=True, verbose_name="Широта")
+    current_lng = models.FloatField(null=True, blank=True, verbose_name="Довгота")
 
     class Meta:
-        verbose_name = 'Профіль водія'
-        verbose_name_plural = 'Профілі водіїв'
+        verbose_name = "Профіль водія"
+        verbose_name_plural = "Профілі водіїв"
 
     def __str__(self):
-        return f'Водій: {self.user.phone_number} ({self.status})'
+        return f"Водій: {self.user.phone_number} ({self.status})"
