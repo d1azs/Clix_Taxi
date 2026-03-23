@@ -7,6 +7,7 @@ import math
 from django.db import transaction
 from django.db.models import Avg, Q
 from django.utils import timezone
+
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -17,8 +18,12 @@ from accounts.permissions import IsDispatcher, IsDriver, IsPassenger
 from vehicles.models import Vehicle
 
 from .models import Order, OrderStatus, Review
-from .serializers import (DispatcherOrderCreateSerializer, OrderSerializer,
-                          PassengerOrderCreateSerializer, ReviewSerializer)
+from .serializers import (
+    DispatcherOrderCreateSerializer,
+    OrderSerializer,
+    PassengerOrderCreateSerializer,
+    ReviewSerializer,
+)
 
 
 def _calculate_price(
