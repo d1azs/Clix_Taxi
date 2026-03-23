@@ -7,29 +7,6 @@ on:
     branches: [ "master" ]
 
 jobs:
-  # build:
-
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     max-parallel: 4
-  #     matrix:
-  #       python-version: [3.12]
-
-  #   steps:
-  #   - uses: actions/checkout@v4
-  #   - name: Set up Python ${{ matrix.python-version }}
-  #     uses: actions/setup-python@v3
-  #     with:
-  #       python-version: ${{ matrix.python-version }}
-  #   - name: Install Dependencies
-  #     run: |
-  #       python -m pip install --upgrade pip
-  #       cd volunteer
-  #       pip install -r requirements.txt
-  #   - name: Run Tests
-  #     run: |
-  #       cd volunteer
-  #       python manage.py test
 
   tests: 
    name: Tests 
@@ -49,70 +26,20 @@ jobs:
      - name: Install dependencies 
        run: |
         python -m pip install --upgrade pip
-        cd volunteer
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-django
 
      - name: Run tests with coverage
        # --cov-fail-under=60: pipeline падає якщо coverage < 60% 
-       run: cd volunteer && pytest --cov=. --cov-report=html --cov-fail-under=60 
+       run: pytest --cov=. --cov-report=html --cov-fail-under=60 
 
      - name: Upload coverage report 
        uses: actions/upload-artifact@v4 
        if: always() 
        with: 
          name: coverage-report 
-         path: volunteer/htmlcov
+         path: htmlcov
          retention-days: 7
-
-  # quality-flake8:
-  #     runs-on: ubuntu-latest
-  #     strategy:
-  #       max-parallel: 4
-  #       matrix:
-  #         python-version: [3.12]
-
-  #     steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Set up Python ${{ matrix.python-version }}
-  #       uses: actions/setup-python@v3
-  #       with:
-  #         python-version: ${{ matrix.python-version }}
-  #     - name: Install Dependencies
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         cd volunteer
-  #         pip install -r requirements.txt
-  #         pip install flake8
-
-  #     - name: Run Linter
-  #       run: |
-  #         cd volunteer
-  #         flake8 .
-
-  # quality-isort:
-  #     runs-on: ubuntu-latest
-  #     strategy:
-  #       max-parallel: 4
-  #       matrix:
-  #         python-version: [3.12]
-
-  #     steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Set up Python ${{ matrix.python-version }}
-  #       uses: actions/setup-python@v3
-  #       with:
-  #         python-version: ${{ matrix.python-version }}
-  #     - name: Install Dependencies
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         cd volunteer
-  #         pip install -r requirements.txt
-  #         pip install isort
-  #     - name: Run isort
-  #       run: |
-  #         cd volunteer
-  #         isort --check-only .
 
   quality:
     name: Code Quality
@@ -137,15 +64,15 @@ jobs:
         
       - name: Flake8 — PEP8 стиль і синтаксис
         continue-on-error: true
-        run: cd volunteer && flake8 .
+        run: flake8 .
 
       - name: Black — перевірка форматування
         # --check: тільки перевіряє, не змінює файли
-        run: cd volunteer && black --check .
+        run: black --check .
       - name: isort — порядок імпортів
-        run: cd volunteer && isort --check-only .
+        run: isort --check-only .
 
       - name: Bandit — security scan
         # -ll: тільки HIGH і MEDIUM severity (не LOW)
         # Знаходить: hardcoded passwords, SQL injection, shell injection
-        run: cd volunteer && bandit -r . -x .venv,migrations -ll
+        run: bandit -r . -x .venv,migrations -ll
