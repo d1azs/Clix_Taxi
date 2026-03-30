@@ -30,7 +30,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             "is_complaint",
             "created_at",
         ]
-        read_only_fields = ["id", "author", "author_phone", "created_at"]
+        read_only_fields = ["id", "order", "author", "author_phone", "target_driver", "created_at"]
 
 
 # ---------------------------------------------------------------------------

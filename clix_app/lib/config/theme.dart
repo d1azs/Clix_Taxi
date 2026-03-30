@@ -11,7 +11,7 @@ class CLIXTheme {
   static const Color primaryLight = Color(0xFF8B7CF6);
   static const Color primaryDark = Color(0xFF4338CA);
   static const Color accent = Color(0xFF7C3AED);
-  static const Color surface = Color(0xFFF8F9FA);
+  static const Color surface = Color(0xFFF4F4F8);
   static const Color background = Colors.white;
   static const Color card = Colors.white;
   static const Color textPrimary = Color(0xFF1A1A2E);
@@ -34,6 +34,14 @@ class CLIXTheme {
   static const double radiusXl = 24.0;
   static const double radiusFull = 100.0;
 
+  // ── Відступи (spacing tokens) ──
+  static const double spaceXs = 4.0;
+  static const double spaceSm = 8.0;
+  static const double spaceMd = 16.0;
+  static const double spaceLg = 24.0;
+  static const double spaceXl = 32.0;
+  static const double pageHPad = 24.0; // горизонтальний padding сторінки
+
   // ── Світла тема (Пасажир / Логін) ──
   static ThemeData get lightTheme {
     return ThemeData(
@@ -51,13 +59,15 @@ class CLIXTheme {
           .copyWith(
             headlineLarge: GoogleFonts.inter(
               fontSize: 32,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               color: textPrimary,
+              letterSpacing: -0.5,
             ),
             headlineMedium: GoogleFonts.inter(
               fontSize: 24,
               fontWeight: FontWeight.w700,
               color: textPrimary,
+              letterSpacing: -0.3,
             ),
             titleLarge: GoogleFonts.inter(
               fontSize: 20,
@@ -90,7 +100,7 @@ class CLIXTheme {
             ElevatedButton.styleFrom(
               backgroundColor: primary,
               foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 56),
+              minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(radiusMd),
               ),
@@ -109,13 +119,18 @@ class CLIXTheme {
                 }
                 return null;
               }),
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(radiusMd),
+                ),
+              ),
             ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style:
             OutlinedButton.styleFrom(
               foregroundColor: primary,
-              minimumSize: const Size(double.infinity, 56),
+              minimumSize: const Size(double.infinity, 54),
               side: const BorderSide(color: primary, width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(radiusMd),
@@ -136,8 +151,8 @@ class CLIXTheme {
         filled: true,
         fillColor: surface,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+          horizontal: spaceMd,
+          vertical: spaceMd,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMd),
@@ -151,28 +166,41 @@ class CLIXTheme {
           borderRadius: BorderRadius.circular(radiusMd),
           borderSide: const BorderSide(color: primary, width: 2),
         ),
-        hintStyle: GoogleFonts.inter(color: textHint),
+        hintStyle: GoogleFonts.inter(color: textHint, fontSize: 14),
+        labelStyle: GoogleFonts.inter(color: textSecondary, fontSize: 14),
       ),
       cardTheme: CardThemeData(
         color: card,
-        elevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.08),
+        elevation: 0,
+        shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusLg),
+          side: const BorderSide(color: divider, width: 1),
         ),
+        margin: const EdgeInsets.only(bottom: spaceSm),
+      ),
+      listTileTheme: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: spaceMd, vertical: spaceXs),
+        minLeadingWidth: 20,
+      ),
+      dividerTheme: const DividerThemeData(
+        color: divider,
+        thickness: 1,
+        space: spaceXl,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: background,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(radiusXl)),
         ),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
         titleTextStyle: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 17,
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
@@ -200,7 +228,7 @@ class CLIXTheme {
             ElevatedButton.styleFrom(
               backgroundColor: primary,
               foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 56),
+              minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(radiusMd),
               ),
@@ -215,21 +243,51 @@ class CLIXTheme {
                 }
                 return null;
               }),
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(radiusMd),
+                ),
+              ),
             ),
       ),
       cardTheme: CardThemeData(
         color: driverCard,
-        elevation: 4,
+        elevation: 0,
+        shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusLg),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.08), width: 1),
         ),
+        margin: const EdgeInsets.only(bottom: spaceSm),
+      ),
+      listTileTheme: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: spaceMd, vertical: spaceXs),
+        minLeadingWidth: 20,
+      ),
+      dividerTheme: DividerThemeData(
+        color: Colors.white.withValues(alpha: 0.1),
+        thickness: 1,
+        space: spaceXl,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: driverCard,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(radiusXl)),
         ),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: driverCard,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
     );
   }
 }
+

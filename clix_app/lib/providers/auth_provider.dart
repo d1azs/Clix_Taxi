@@ -41,14 +41,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final data = await _api.login(phone, password);
-      _user = UserModel(
-        id: data['user_id'] ?? '',
-        phoneNumber: phone,
-        firstName: '',
-        lastName: '',
-        roles: List<String>.from(data['roles'] ?? []),
-      );
+      await _api.login(phone, password);
+      // Завантажуємо повний профіль з іменем/прізвищем
+      final me = await _api.getMe();
+      _user = UserModel.fromJson(me);
       _activeRole = _user!.roles.first;
       _isLoading = false;
       notifyListeners();
@@ -97,6 +93,27 @@ class AuthProvider extends ChangeNotifier {
     if (_user != null && _user!.roles.contains(role)) {
       _activeRole = role;
       notifyListeners();
+    }
+  }
+
+  /// Оновлення профілю (ім'я та прізвище)
+  Future<bool> updateProfile({
+    required String firstName,
+    required String lastName,
+  }) async {
+    try {
+      await _api.updateProfile(firstName: firstName, lastName: lastName);
+      _user = UserModel(
+        id: _user!.id,
+        phoneNumber: _user!.phoneNumber,
+        firstName: firstName,
+        lastName: lastName,
+        roles: _user!.roles,
+      );
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

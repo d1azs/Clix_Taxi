@@ -102,7 +102,15 @@ class PassengerActiveOrderView(APIView):
                 passenger=request.user,
                 status__in=active_statuses,
             )
-            .exclude(status=OrderStatus.COMPLETED, review__isnull=False)
+            # Виключаємо COMPLETED якщо: вже є відгук або пасажир натиснув "Пропустити"
+            .exclude(
+                status=OrderStatus.COMPLETED,
+                review__isnull=False,
+            )
+            .exclude(
+                status=OrderStatus.COMPLETED,
+                passenger_dismissed_rating=True,
+            )
             .select_related("driver", "driver__user")
             .order_by("-created_at")
             .first()
@@ -114,6 +122,57 @@ class PassengerActiveOrderView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(OrderSerializer(order).data)
+
+
+class DismissRatingView(APIView):
+    """
+    POST /api/passenger/orders/<id>/dismiss-rating/ —
+    Пасажир натискає "Пропустити" в діалозі оцінки.
+    """
+
+    permission_classes = [IsPassenger]
+
+    def post(self, request, pk):
+        try:
+            order = Order.objects.get(
+                pk=pk,
+                passenger=request.user,
+                status=OrderStatus.COMPLETED,
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Замовлення не знайдено"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        order.passenger_dismissed_rating = True
+        order.save(update_fields=["passenger_dismissed_rating"])
+        return Response({"detail": "Оцінку пропущено"})
+
+
+class PassengerCancelOrderView(APIView):
+    """
+    POST /api/passenger/orders/<id>/cancel/ — Пасажир скасовує своє замовлення.
+    Дозволено лише для статусів PENDING та ACCEPTED (водій ще не виїхав).
+    """
+
+    permission_classes = [IsPassenger]
+
+    def post(self, request, pk):
+        cancellable = [OrderStatus.PENDING, OrderStatus.ACCEPTED]
+        try:
+            order = Order.objects.get(
+                pk=pk,
+                passenger=request.user,
+                status__in=cancellable,
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Замовлення не знайдено або не може бути скасоване"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        order.status = OrderStatus.CANCELLED
+        order.save(update_fields=["status"])
+        return Response({"detail": "Замовлення скасовано"})
 
 
 # ╔═════════════════════════════════════════════════════════════════════════╗
@@ -441,10 +500,12 @@ class CreateReviewView(generics.CreateAPIView):
         )
 
         # Перерахунок середнього рейтингу водія
+        # Зважений — початкове 5.0 враховується як 5 «віртуальних» оцінок
         driver = order.driver
-        avg = Review.objects.filter(target_driver=driver).aggregate(
-            avg_rating=Avg("rating")
-        )["avg_rating"]
-        if avg:
-            driver.rating = round(avg, 2)
-            driver.save(update_fields=["rating"])
+        reviews = Review.objects.filter(target_driver=driver)
+        review_count = reviews.count()
+        review_sum = sum(r.rating for r in reviews)
+        # 5 віртуальних оцінок по 5.0 + реальні оцінки
+        weighted_avg = (5 * 5.0 + review_sum) / (5 + review_count)
+        driver.rating = round(weighted_avg, 2)
+        driver.save(update_fields=["rating"])

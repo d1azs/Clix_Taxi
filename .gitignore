@@ -1,6 +1,33 @@
+# Python
 venv/
 __pycache__/
 *.pyc
 db.sqlite3
-.DS_Store
 .env
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Flutter
+clix_app/.dart_tool/
+clix_app/build/
+clix_app/.flutter-plugins
+clix_app/.flutter-plugins-dependencies
+
+# Допоміжні txt-файли (диплом, презентація тощо)
+diploma.txt
+speech.txt
+presentation.txt
+swot_analysis.txt
+clix_architecture_plan.txt
+fix.txt
+
+# Pytest
+.pytest_cache/
+
+# Gemini
+.gemini/

@@ -55,7 +55,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         max_length=20,
         unique=True,
         verbose_name="Номер телефону",
-        help_text="Формат: +420XXXXXXXXX",
+        help_text="Формат: +380XXXXXXXXX",
     )
     first_name = models.CharField(max_length=100, blank=True, verbose_name="Ім'я")
     last_name = models.CharField(max_length=100, blank=True, verbose_name="Прізвище")

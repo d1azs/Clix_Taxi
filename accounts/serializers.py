@@ -82,6 +82,18 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 # ---------------------------------------------------------------------------
+# Оновлення профілю (PATCH)
+# ---------------------------------------------------------------------------
+class UpdateProfileSerializer(serializers.ModelSerializer):
+    """Серіалайзер для редагування імені та прізвища."""
+
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name"]
+
+
+
+# ---------------------------------------------------------------------------
 # Профіль водія
 # ---------------------------------------------------------------------------
 class DriverProfileSerializer(serializers.ModelSerializer):

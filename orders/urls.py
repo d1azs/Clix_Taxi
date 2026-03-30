@@ -20,6 +20,17 @@ urlpatterns = [
         views.PassengerActiveOrderView.as_view(),
         name="passenger-order-active",
     ),
+    path(
+        "passenger/orders/<uuid:pk>/cancel/",
+        views.PassengerCancelOrderView.as_view(),
+        name="passenger-order-cancel",
+    ),
+    path(
+        "passenger/orders/<uuid:pk>/dismiss-rating/",
+        views.DismissRatingView.as_view(),
+        name="passenger-order-dismiss-rating",
+    ),
+
     # ── Водій ──
     path(
         "driver/orders/active/",

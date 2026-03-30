@@ -14,6 +14,7 @@ from .serializers import (
     CLIXTokenObtainPairSerializer,
     DriverProfileSerializer,
     RegisterSerializer,
+    UpdateProfileSerializer,
     UserSerializer,
 )
 
@@ -41,11 +42,15 @@ class RegisterView(generics.CreateAPIView):
 # ---------------------------------------------------------------------------
 # Поточний користувач
 # ---------------------------------------------------------------------------
-class MeView(generics.RetrieveAPIView):
-    """GET /api/users/me/ — Данi поточного користувача."""
+class MeView(generics.RetrieveUpdateAPIView):
+    """GET/PATCH /api/users/me/ — Дані та оновлення поточного користувача."""
 
-    serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method in ('PATCH', 'PUT'):
+            return UpdateProfileSerializer
+        return UserSerializer
 
     def get_object(self):
         return self.request.user

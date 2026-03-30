@@ -15,7 +15,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController(text: '+380');
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLogin = true; // true = вхід, false = реєстрація
 
@@ -23,7 +24,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     super.dispose();
   }
 
@@ -33,25 +35,39 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text.trim();
 
     if (phone.length < 10 || password.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Заповніть усі поля')));
+      _showError('Заповніть усі поля');
       return;
     }
 
     if (_isLogin) {
-      await auth.login(phone, password);
+      final ok = await auth.login(phone, password);
+      if (!ok && mounted) _showError(auth.error ?? 'Помилка входу');
     } else {
-      // Реєстрація
-      final name = _nameController.text.trim();
-      if (name.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Введіть ім'я")));
+      final firstName = _firstNameController.text.trim();
+      if (firstName.isEmpty) {
+        _showError("Введіть ім'я");
         return;
       }
-      await auth.register(phone: phone, password: password, firstName: name);
+      final lastName = _lastNameController.text.trim();
+      await auth.register(
+        phone: phone,
+        password: password,
+        firstName: firstName,
+        lastName: lastName.isNotEmpty ? lastName : null,
+      );
     }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: CLIXTheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -62,58 +78,55 @@ class _LoginScreenState extends State<LoginScreen> {
         builder: (context, auth, _) {
           return SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: CLIXTheme.spaceLg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 48),
 
-                  // Заголовок
+                  // ── Заголовок форми ──
                   Text(
-                    _isLogin ? 'Вхід' : 'Реєстрація',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 32,
-                    ),
+                    _isLogin ? 'Вхід до акаунту' : 'Реєстрація',
+                    style: Theme.of(context).textTheme.headlineMedium,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: CLIXTheme.spaceSm),
                   Text(
                     _isLogin
                         ? 'Введіть номер телефону для входу'
                         : 'Створіть акаунт для замовлення таксі',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: CLIXTheme.spaceXl),
 
-                  // Ім'я (тільки для реєстрації)
+                  // ── Ім'я (тільки для реєстрації) ──
                   if (!_isLogin) ...[
-                    Text(
-                      "Ім'я",
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: CLIXTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    _fieldLabel("Ім'я"),
+                    const SizedBox(height: CLIXTheme.spaceSm),
                     TextField(
-                      controller: _nameController,
+                      controller: _firstNameController,
+                      textCapitalization: TextCapitalization.words,
                       decoration: const InputDecoration(
-                        hintText: 'Ваше ім\'я',
+                        hintText: 'Олексій',
                         prefixIcon: Icon(Icons.person_outline),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: CLIXTheme.spaceMd),
+                    _fieldLabel("Прізвище (необов'язково)"),
+                    const SizedBox(height: CLIXTheme.spaceSm),
+                    TextField(
+                      controller: _lastNameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        hintText: 'Коваленко',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                    ),
+                    const SizedBox(height: CLIXTheme.spaceMd),
                   ],
 
-                  // Поле телефону
-                  Text(
-                    'Номер телефону',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: CLIXTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                  // ── Поле телефону ──
+                  _fieldLabel('Номер телефону'),
+                  const SizedBox(height: CLIXTheme.spaceSm),
                   TextField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
@@ -138,47 +151,40 @@ class _LoginScreenState extends State<LoginScreen> {
                       hintText: '+380 97 123 4567',
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: CLIXTheme.spaceMd),
 
-                  // Поле пароля
-                  Text(
-                    'Пароль',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: CLIXTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                  // ── Поле пароля ──
+                  _fieldLabel('Пароль'),
+                  const SizedBox(height: CLIXTheme.spaceSm),
                   TextField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      hintText: 'Введіть пароль',
+                      hintText: 'Мінімум 6 символів',
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
                           color: CLIXTheme.textHint,
                         ),
-                        onPressed: () {
-                          setState(() => _obscurePassword = !_obscurePassword);
-                        },
+                        onPressed: () =>
+                            setState(() => _obscurePassword = !_obscurePassword),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: CLIXTheme.spaceXl),
 
-                  // Кнопка "Продовжити"
+                  // ── Кнопка ──
                   SizedBox(
                     width: double.infinity,
-                    height: 56,
+                    height: 54,
                     child: ElevatedButton(
                       onPressed: auth.isLoading ? null : _handleSubmit,
                       child: auth.isLoading
                           ? const SizedBox(
-                              width: 24,
-                              height: 24,
+                              width: 22,
+                              height: 22,
                               child: CircularProgressIndicator(
                                 color: Colors.white,
                                 strokeWidth: 2.5,
@@ -188,22 +194,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  // Помилка
-                  if (auth.error != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      auth.error!,
-                      style: const TextStyle(color: CLIXTheme.error),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                  const SizedBox(height: CLIXTheme.spaceLg),
 
-                  const SizedBox(height: 24),
-
-                  // Перемикач вхід/реєстрація
+                  // ── Перемикач вхід/реєстрація ──
                   Center(
                     child: GestureDetector(
-                      onTap: () => setState(() => _isLogin = !_isLogin),
+                      onTap: () => setState(() {
+                        _isLogin = !_isLogin;
+                        _firstNameController.clear();
+                        _lastNameController.clear();
+                      }),
                       child: Text.rich(
                         TextSpan(
                           text: _isLogin
@@ -223,12 +223,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: CLIXTheme.spaceXl),
                 ],
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _fieldLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: CLIXTheme.textPrimary,
       ),
     );
   }

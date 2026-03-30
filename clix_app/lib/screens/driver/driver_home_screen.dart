@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show cos, Random;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -50,6 +51,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
   // Маршрут
   List<LatLng> _routePoints = [];
+  List<LatLng> _visibleRoute = []; // поточна видима частина маршруту
+
+  // ── DEMO анімація руху машини водія ──
+  LatLng? _demoCarLocation; // поточна позиція машини на карті
+  Timer? _demoCarTimer;
+  List<LatLng> _demoCarWaypoints = [];
+  int _demoCarIndex = 0;
+  bool _demoCarActive = false;
 
   static const _mapStyles = [
     {
@@ -122,6 +131,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   void dispose() {
     _pollTimer?.cancel();
     _progressTimer?.cancel();
+    _demoCarTimer?.cancel();
     _pulseController.dispose();
     _sheetController.dispose();
     super.dispose();
@@ -199,14 +209,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   Future<void> _acceptOrder(OrderModel order) async {
     try {
       final data = await _api.acceptOrder(order.id);
+      final acceptedOrder = OrderModel.fromJson(data);
       setState(() {
-        _currentOrder = OrderModel.fromJson(data);
+        _currentOrder = acceptedOrder;
         _availableOrders.clear();
       });
       _stopPolling();
       _startTripProgress('ACCEPTED');
-      // Будуємо маршрут
-      _buildOrderRoute(_currentOrder!);
+      _buildOrderRoute(acceptedOrder);
+      // DEMO: починаємо рух до пасажира
+      _startDemoCarToPickup(acceptedOrder);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -222,7 +234,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     try {
       final data = await _api.updateOrderStatus(_currentOrder!.id, newStatus);
       if (newStatus == 'COMPLETED') {
-        // Додаємо заробіток
         final earned = _currentOrder!.estimatedPrice ?? 0;
         setState(() {
           _currentOrder = null;
@@ -230,12 +241,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           _todayEarnings += earned;
           _tripProgress = 0;
           _routePoints = [];
+          _visibleRoute = [];
+          _demoCarLocation = null;
         });
+        _stopDemoCar();
         _progressTimer?.cancel();
         _startPolling();
       } else {
-        setState(() => _currentOrder = OrderModel.fromJson(data));
+        final updatedOrder = OrderModel.fromJson(data);
+        setState(() => _currentOrder = updatedOrder);
         _startTripProgress(newStatus);
+        // DEMO: запускаємо анімацію по зміні статусу
+        if (newStatus == 'EN_ROUTE') {
+          // водій "прибув" — машина стає біля пасажира
+          _stopDemoCar();
+          setState(() {
+            _demoCarLocation = LatLng(updatedOrder.pickupLat, updatedOrder.pickupLng);
+          });
+        } else if (newStatus == 'IN_PROGRESS') {
+          _startDemoCarTrip(updatedOrder);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -252,10 +277,93 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     final to = LatLng(order.dropoffLat, order.dropoffLng);
     final points = await _routing.getRoute(from, to);
     if (points != null && mounted) {
-      setState(() => _routePoints = points);
+      setState(() {
+        _routePoints = points;
+        _visibleRoute = List.from(points);
+      });
       // Авто-зум щоб маршрут помістився
       _fitRouteOnMap();
     }
+  }
+
+  // ── DEMO: водій рухається до пасажира (ACCEPTED/EN_ROUTE) ──
+  void _startDemoCarToPickup(OrderModel order) async {
+    _stopDemoCar();
+    final pickup = LatLng(order.pickupLat, order.pickupLng);
+    // Старт ~ 0.5 км від pickup (фактична позиція водія до прийняття)
+    final rng = Random();
+    final angleRad = rng.nextDouble() * 6.28318;
+    final startPt = LatLng(
+      pickup.latitude + 0.004 * cos(angleRad),
+      pickup.longitude + 0.007 * cos(angleRad + 1.1),
+    );
+    final route = await _routing.getRoute(startPt, pickup);
+    final waypoints = route ?? _interpolateWaypoints(startPt, pickup, 16);
+    if (!mounted) return;
+    setState(() {
+      _demoCarWaypoints = waypoints;
+      _demoCarIndex = 0;
+      _demoCarLocation = waypoints.first;
+    });
+    _demoCarActive = true;
+    _demoCarTimer = Timer.periodic(const Duration(milliseconds: 1400), (t) {
+      if (!mounted || !_demoCarActive) { t.cancel(); return; }
+      if (_demoCarIndex < _demoCarWaypoints.length - 1) {
+        _demoCarIndex++;
+        setState(() {
+          _demoCarLocation = _demoCarWaypoints[_demoCarIndex];
+        });
+      } else {
+        t.cancel();
+      }
+    });
+  }
+
+  // ── DEMO: водій везе пасажира до призначення (IN_PROGRESS) по OSRMмаршруту ──
+  void _startDemoCarTrip(OrderModel order) async {
+    _stopDemoCar();
+    final from = LatLng(order.pickupLat, order.pickupLng);
+    final waypoints = _routePoints.isNotEmpty
+        ? _routePoints
+        : (await _routing.getRoute(from, LatLng(order.dropoffLat, order.dropoffLng)))
+            ?? _interpolateWaypoints(from, LatLng(order.dropoffLat, order.dropoffLng), 20);
+    if (!mounted) return;
+    setState(() {
+      _demoCarWaypoints = waypoints;
+      _demoCarIndex = 0;
+      _demoCarLocation = waypoints.first;
+      _visibleRoute = List.from(waypoints);
+    });
+    _demoCarActive = true;
+    _demoCarTimer = Timer.periodic(const Duration(milliseconds: 1600), (t) {
+      if (!mounted || !_demoCarActive) { t.cancel(); return; }
+      if (_demoCarIndex < _demoCarWaypoints.length - 1) {
+        _demoCarIndex++;
+        setState(() {
+          _demoCarLocation = _demoCarWaypoints[_demoCarIndex];
+          _visibleRoute = _demoCarWaypoints.sublist(_demoCarIndex);
+        });
+      } else {
+        t.cancel();
+      }
+    });
+  }
+
+  void _stopDemoCar() {
+    _demoCarTimer?.cancel();
+    _demoCarActive = false;
+  }
+
+  List<LatLng> _interpolateWaypoints(LatLng start, LatLng end, int count) {
+    final pts = <LatLng>[];
+    for (int i = 0; i <= count; i++) {
+      final t = i / count;
+      pts.add(LatLng(
+        start.latitude + (end.latitude - start.latitude) * t,
+        start.longitude + (end.longitude - start.longitude) * t,
+      ));
+    }
+    return pts;
   }
 
   /// Авто-зум карти щоб маршрут повністю був видний.
@@ -472,7 +580,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           PolylineLayer(
             polylines: [
               Polyline(
-                points: _routePoints,
+                points: _visibleRoute.isNotEmpty ? _visibleRoute : _routePoints,
                 strokeWidth: 5.0,
                 color: CLIXTheme.primary,
                 borderStrokeWidth: 2.0,
@@ -502,21 +610,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                   ),
                 ),
               ),
+            // DEMO: машина водія
+            if (_demoCarLocation != null)
+              Marker(
+                point: _demoCarLocation!,
+                width: 54,
+                height: 54,
+                child: const _DriverCarMarker(),
+              ),
             // Маркери поточного замовлення
             if (_currentOrder != null) ...[
-              Marker(
-                point: LatLng(
-                  _currentOrder!.pickupLat,
-                  _currentOrder!.pickupLng,
+              // Точка підбору — прибираємо коли пасажир вже в машині
+              if (_currentOrder!.status != 'IN_PROGRESS')
+                Marker(
+                  point: LatLng(
+                    _currentOrder!.pickupLat,
+                    _currentOrder!.pickupLng,
+                  ),
+                  width: 40,
+                  height: 40,
+                  child: const Icon(
+                    Icons.radio_button_checked,
+                    color: Colors.green,
+                    size: 28,
+                  ),
                 ),
-                width: 40,
-                height: 40,
-                child: const Icon(
-                  Icons.radio_button_checked,
-                  color: Colors.green,
-                  size: 28,
-                ),
-              ),
               Marker(
                 point: LatLng(
                   _currentOrder!.dropoffLat,
@@ -1216,6 +1334,83 @@ class _DarkAddressRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── DEMO: фіолетова пульсуюча іконка машини водія на карті ──
+class _DriverCarMarker extends StatefulWidget {
+  const _DriverCarMarker();
+
+  @override
+  State<_DriverCarMarker> createState() => _DriverCarMarkerState();
+}
+
+class _DriverCarMarkerState extends State<_DriverCarMarker>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.85, end: 1.15).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) => Transform.scale(
+        scale: _pulse.value,
+        child: child,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: CLIXTheme.primary.withValues(alpha: 0.22),
+            ),
+          ),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: CLIXTheme.primary,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: CLIXTheme.primary.withValues(alpha: 0.6),
+                  blurRadius: 14,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.directions_car,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

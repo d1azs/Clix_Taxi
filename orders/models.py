@@ -115,6 +115,13 @@ class Order(models.Model):
         help_text="Encoded polyline від Google Directions API",
     )
 
+    # Пасажир натиснув "Пропустити" в діалозі оцінки
+    passenger_dismissed_rating = models.BooleanField(
+        default=False,
+        verbose_name="Оцінку пропущено",
+        help_text="True якщо пасажир скасував оцінку без відгуку",
+    )
+
     # Часові мітки
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Створено")
     accepted_at = models.DateTimeField(null=True, blank=True, verbose_name="Прийнято о")

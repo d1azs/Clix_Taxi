@@ -322,10 +322,117 @@ class _ScheduledPage extends StatelessWidget {
 class _ProfilePage extends StatelessWidget {
   const _ProfilePage();
 
+  /// Повертає 1-2 літери для аватарки
+  String _initials(UserModel? user) {
+    if (user == null) return '?';
+    final first = user.firstName.isNotEmpty ? user.firstName[0] : '';
+    final last = user.lastName.isNotEmpty ? user.lastName[0] : '';
+    final initials = (first + last).toUpperCase().trim();
+    return initials.isNotEmpty ? initials : '?';
+  }
+
+  Future<void> _showEditDialog(BuildContext context, UserModel user) async {
+    final firstCtrl = TextEditingController(text: user.firstName);
+    final lastCtrl = TextEditingController(text: user.lastName);
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'Редагувати профіль',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: firstCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText: "Ім'я",
+                  prefixIcon: const Icon(Icons.person_outline),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: lastCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText: 'Прізвище',
+                  prefixIcon: const Icon(Icons.person_outline),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: Text('Скасувати',
+                  style: TextStyle(color: Colors.grey.shade600)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CLIXTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setDlg(() => saving = true);
+                      final auth = context.read<AuthProvider>();
+                      final ok = await auth.updateProfile(
+                        firstName: firstCtrl.text.trim(),
+                        lastName: lastCtrl.text.trim(),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok
+                                ? '✅ Профіль збережено'
+                                : '❌ Помилка збереження'),
+                            backgroundColor:
+                                ok ? CLIXTheme.success : CLIXTheme.error,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Зберегти'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
+    final initials = _initials(user);
+    final fullName =
+        user?.fullName.isNotEmpty == true ? user!.fullName : 'Пасажир';
 
     return Scaffold(
       backgroundColor: CLIXTheme.surface,
@@ -335,35 +442,75 @@ class _ProfilePage extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              // Аватар
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [CLIXTheme.primary, CLIXTheme.primaryDark],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    (user?.firstName.isNotEmpty == true)
-                        ? user!.firstName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
+              // Аватар з ініціалами
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [CLIXTheme.primary, CLIXTheme.primaryDark],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: CLIXTheme.primary.withValues(alpha: 0.35),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 34,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  // Кнопка редагування на аватарці
+                  GestureDetector(
+                    onTap: user != null
+                        ? () => _showEditDialog(context, user)
+                        : null,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: CLIXTheme.primary.withValues(alpha: 0.2),
+                            width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.edit,
+                          size: 14, color: CLIXTheme.primary),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
+              // Повне ім'я
               Text(
-                user?.firstName ?? 'Пасажир',
+                fullName,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
+                  color: CLIXTheme.textPrimary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -380,7 +527,9 @@ class _ProfilePage extends StatelessWidget {
               _profileTile(
                 icon: Icons.edit_outlined,
                 label: 'Редагувати профіль',
-                onTap: () {},
+                onTap: () {
+                  if (user != null) _showEditDialog(context, user);
+                },
               ),
               _profileTile(
                 icon: Icons.payment_outlined,
@@ -426,6 +575,7 @@ class _ProfilePage extends StatelessWidget {
   }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         leading: Icon(icon, color: color ?? CLIXTheme.textSecondary),
         title: Text(

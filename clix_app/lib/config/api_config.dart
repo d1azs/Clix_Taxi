@@ -18,6 +18,7 @@ class ApiConfig {
   // Ендпоінти пасажира
   static const String passengerCreateOrder = '/passenger/orders/';
   static const String passengerActiveOrder = '/passenger/orders/active/';
+  static String cancelPassengerOrder(String id) => '/passenger/orders/$id/cancel/';
 
   // Ендпоінти замовлень
   static const String availableOrders = '/orders/available/';

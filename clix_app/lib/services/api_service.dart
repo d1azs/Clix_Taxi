@@ -182,6 +182,17 @@ class ApiService {
     return response.data;
   }
 
+  Future<Map<String, dynamic>> updateProfile({
+    required String firstName,
+    required String lastName,
+  }) async {
+    final response = await _dio.patch(
+      ApiConfig.me,
+      data: {'first_name': firstName, 'last_name': lastName},
+    );
+    return response.data;
+  }
+
   // ── Водій ──
 
   Future<Map<String, dynamic>> getDriverStatus() async {
@@ -245,6 +256,10 @@ class ApiService {
     }
   }
 
+  Future<void> cancelPassengerOrder(String orderId) async {
+    await _dio.post(ApiConfig.cancelPassengerOrder(orderId));
+  }
+
   // ── Замовлення (водій) ──
 
   Future<List<dynamic>> getAvailableOrders() async {
@@ -295,6 +310,13 @@ class ApiService {
       ApiConfig.createReview(orderId),
       data: {'rating': rating, 'comment': comment, 'is_complaint': isComplaint},
     );
+  }
+
+  /// Пасажир пропускає оцінку — бекенд більше не поверне це замовлення
+  Future<void> dismissRating(String orderId) async {
+    try {
+      await _dio.post('${ApiConfig.baseUrl}passenger/orders/$orderId/dismiss-rating/');
+    } catch (_) {}
   }
 
   // ── Історія ──
