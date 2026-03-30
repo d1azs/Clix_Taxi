@@ -29,24 +29,24 @@
 
 ```
 ┌──────────────────────────────────────────────┐
-│              Flutter Mobile App               │
+│              Flutter Mobile App              │
 │       ┌──────────┐    ┌──────────┐           │
-│       │ Passenger │    │  Driver  │           │
-│       │  Screen   │    │  Screen  │           │
+│       │ Passenger │    │  Driver  │          │
+│       │  Screen   │    │  Screen  │          │
 │       └────┬─────┘    └────┬─────┘           │
-│            └───────┬───────┘                  │
-│                    ▼                          │
-│            API Service (Dio)                  │
+│            └───────┬───────┘                 │
+│                    ▼                         │
+│            API Service (Dio)                 │
 └─────────────────── │ ────────────────────────┘
                      │  REST API (JWT)
 ┌─────────────────── ▼ ────────────────────────┐
-│           Django REST Framework               │
+│           Django REST Framework              │
 │  ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
 │  │ Accounts │ │  Orders  │ │   Vehicles   │  │
 │  │  Module  │ │  Module  │ │    Module    │  │
 │  └──────────┘ └──────────┘ └──────────────┘  │
-│                    │                          │
-│               SQLite DB                       │
+│                    │                         │
+│               SQLite DB                      │
 └──────────────────────────────────────────────┘
 ```
 
