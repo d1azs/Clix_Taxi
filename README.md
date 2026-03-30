@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/CLIX-Taxi-5E48E8?style=for-the-badge&logo=uber&logoColor=white" alt="CLIX Taxi" />
+  <img src="assets/logo.jpg" width="120" alt="CLIX Logo" />
 </p>
 
-<h1 align="center">🚕 CLIX — Taxi Service Platform</h1>
+<h1 align="center">CLIX — Taxi Service Platform</h1>
 
 <p align="center">
-  <strong>Мобільна платформа для замовлення таксі з трьома ролями: пасажир, водій, диспетчер</strong>
+  <strong>Мобільна платформа для замовлення таксі з ролями пасажира та водія</strong>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Flutter-3.10+-02569B?style=flat-square&logo=flutter" />
   <img src="https://img.shields.io/badge/Django-6.0-092E20?style=flat-square&logo=django" />
   <img src="https://img.shields.io/badge/DRF-3.16-red?style=flat-square" />
-  <img src="https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=flat-square&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite&logoColor=white" />
   <img src="https://img.shields.io/badge/JWT-Auth-orange?style=flat-square&logo=jsonwebtokens" />
 </p>
 
@@ -22,7 +22,7 @@
 
 **CLIX** — це повноцінна платформа для виклику таксі. Система складається з:
 
-- **📱 Flutter-додаток** — єдиний мобільний застосунок з підтримкою трьох ролей (пасажир, водій, диспетчер)
+- **📱 Flutter-додаток** — єдиний мобільний застосунок з підтримкою ролей пасажира та водія
 - **⚙️ Django REST API** — бекенд з JWT-аутентифікацією, управлінням замовленнями та рейтинговою системою
 
 ## 🏗️ Архітектура
@@ -30,11 +30,11 @@
 ```
 ┌──────────────────────────────────────────────┐
 │              Flutter Mobile App               │
-│  ┌──────────┐ ┌──────────┐ ┌───────────────┐ │
-│  │ Passenger │ │  Driver  │ │  Dispatcher   │ │
-│  │  Screen   │ │  Screen  │ │   Screen      │ │
-│  └────┬─────┘ └────┬─────┘ └──────┬────────┘ │
-│       └────────────┼───────────────┘          │
+│       ┌──────────┐    ┌──────────┐           │
+│       │ Passenger │    │  Driver  │           │
+│       │  Screen   │    │  Screen  │           │
+│       └────┬─────┘    └────┬─────┘           │
+│            └───────┬───────┘                  │
 │                    ▼                          │
 │            API Service (Dio)                  │
 └─────────────────── │ ────────────────────────┘
@@ -46,7 +46,7 @@
 │  │  Module  │ │  Module  │ │    Module    │  │
 │  └──────────┘ └──────────┘ └──────────────┘  │
 │                    │                          │
-│              PostgreSQL DB                    │
+│               SQLite DB                       │
 └──────────────────────────────────────────────┘
 ```
 
@@ -68,12 +68,6 @@
 - Статистика заробітку та кількості поїздок
 - Рейтингова система
 
-### 🎛️ Диспетчер
-- Моніторинг усіх замовлень у реальному часі
-- Створення замовлень від імені клієнтів
-- Перегляд та обробка скарг
-- Скасування замовлень
-
 ## 🛠️ Технологічний стек
 
 | Компонент | Технологія |
@@ -86,7 +80,7 @@
 | **Geocoding** | Nominatim API |
 | **Backend** | Django 6.0, Django REST Framework 3.16 |
 | **Auth** | JWT (SimpleJWT) |
-| **Database** | PostgreSQL 15+ |
+| **Database** | SQLite 3 |
 | **Code Quality** | Black, isort, Flake8 |
 | **CI/CD** | GitHub Actions |
 
@@ -95,7 +89,6 @@
 ### Передумови
 - Python 3.12+
 - Flutter 3.10+
-- PostgreSQL 15+
 
 ### Backend
 
@@ -139,7 +132,6 @@ flutter run
 |------|---------|--------|
 | 🧍 Пасажир | `+380971234567` | `password123` |
 | 🚗 Водій | `+380661234567` | `password123` |
-| 🎛️ Диспетчер | `+380931234567` | `password123` |
 
 ## 📁 Структура проєкту
 
@@ -167,8 +159,7 @@ Clix_Taxi/
 │       ├── screens/    # UI екрани
 │       │   ├── auth/       # Логін, вибір ролі
 │       │   ├── passenger/  # Екран пасажира
-│       │   ├── driver/     # Екран водія
-│       │   └── dispatcher/ # Екран диспетчера
+│       │   └── driver/     # Екран водія
 │       └── services/   # API, Routing, Geocoding
 ├── seed_data.py        # Скрипт для тестових даних
 ├── requirements.txt    # Python залежності
@@ -204,4 +195,3 @@ Clix_Taxi/
 |-------|----------|------|
 | `GET` | `/api/orders/history/` | Історія поїздок |
 | `POST` | `/api/orders/<id>/review/` | Залишити відгук |
-
