@@ -91,6 +91,10 @@ class ApiService {
     );
   }
 
+  Future<String?> getAccessToken() async {
+    return await _storage.read(key: 'access_token');
+  }
+
   // ── Авторизація ──
 
   /// Логін: повертає JWT-токени + ролі

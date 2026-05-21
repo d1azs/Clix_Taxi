@@ -636,9 +636,20 @@ class _DriverProfilePage extends StatelessWidget {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(ok
-                                ? '✅ Профіль збережено'
-                                : '❌ Помилка збереження'),
+                            content: Row(
+                              children: [
+                                Icon(
+                                  ok ? Icons.check_circle_outline : Icons.error_outline,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  ok ? 'Профіль збережено' : 'Помилка збереження',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
                             backgroundColor:
                                 ok ? CLIXTheme.success : CLIXTheme.error,
                             behavior: SnackBarBehavior.floating,

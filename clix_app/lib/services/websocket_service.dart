@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'api_service.dart';
 
 class WebSocketService {
   static final WebSocketService _instance = WebSocketService._internal();
@@ -11,11 +11,10 @@ class WebSocketService {
 
   WebSocketChannel? _channel;
   Timer? _reconnectTimer;
-  final _storage = const FlutterSecureStorage();
   
   // baseUrl of WebSocket like ws://10.0.2.2:8000/ws
-  // In a real app we parse it from dotenv, but hardcoded here for simplicity:
   final String _wsUrl = 'wss://clix-taxi.onrender.com/ws'; 
+
 
   final StreamController<Map<String, dynamic>> _messageController = StreamController.broadcast();
   Stream<Map<String, dynamic>> get messages => _messageController.stream;
@@ -25,7 +24,7 @@ class WebSocketService {
   void connect(String endpoint) async {
     if (_isConnected) return;
     
-    final token = await _storage.read(key: 'access_token');
+    final token = await ApiService().getAccessToken();
     if (token == null) return;
 
     final url = '$_wsUrl/$endpoint/?token=$token';

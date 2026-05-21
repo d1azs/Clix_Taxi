@@ -49,9 +49,11 @@ class _AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    print('DEBUG: _AuthGate build - isLoggedIn: ${auth.isLoggedIn}, activeRole: ${auth.activeRole}');
 
     // Не залогінений — показуємо логін
     if (!auth.isLoggedIn) {
+      print('DEBUG: _AuthGate - returning LoginScreen');
       return const LoginScreen();
     }
 

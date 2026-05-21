@@ -35,8 +35,8 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
   @override
   void initState() {
     super.initState();
+    print('DEBUG: DispatcherHomeScreen initState called');
     _tabController = TabController(length: 5, vsync: this);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _loadData();
     // Авто-оновлення кожні 15 секунд
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) => _loadData());
@@ -46,7 +46,6 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
   void dispose() {
     _tabController.dispose();
     _refreshTimer?.cancel();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -81,6 +80,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    print('DEBUG: DispatcherHomeScreen build called, _isLoading: $_isLoading');
     final auth = context.watch<AuthProvider>();
     return Scaffold(
       backgroundColor: CLIXTheme.surface,
@@ -116,11 +116,26 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
           indicatorColor: CLIXTheme.primary,
           labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           tabs: [
-            Tab(text: '📋 Замовлення (${_activeOrders.length})'),
-            Tab(text: '👥 Водії (${_onlineDrivers.length})'),
-            const Tab(text: '🗺️ Карта'),
-            Tab(text: '🛡️ KYC (${_pendingKyc.length})'),
-            const Tab(text: '📊 Стат.'),
+            Tab(
+              icon: const Icon(Icons.assignment_outlined),
+              text: 'Замовлення (${_activeOrders.length})',
+            ),
+            Tab(
+              icon: const Icon(Icons.people_alt_outlined),
+              text: 'Водії (${_onlineDrivers.length})',
+            ),
+            const Tab(
+              icon: Icon(Icons.map_outlined),
+              text: 'Карта',
+            ),
+            Tab(
+              icon: const Icon(Icons.verified_user_outlined),
+              text: 'KYC (${_pendingKyc.length})',
+            ),
+            const Tab(
+              icon: Icon(Icons.bar_chart_outlined),
+              text: 'Статистика',
+            ),
           ],
         ),
       ),
@@ -203,15 +218,31 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
             if (order.passengerPhone != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('📞 ${order.passengerPhone}',
-                    style: const TextStyle(fontSize: 12, color: CLIXTheme.textHint)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.phone, size: 12, color: CLIXTheme.textHint),
+                    const SizedBox(width: 4),
+                    Text(order.passengerPhone!,
+                        style: const TextStyle(fontSize: 12, color: CLIXTheme.textHint)),
+                  ],
+                ),
               ),
             // Driver info
             if (order.driverInfo != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('🚗 ${order.driverInfo!.fullName} (★${order.driverInfo!.rating.toStringAsFixed(1)})',
-                    style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.directions_car, size: 12, color: CLIXTheme.textSecondary),
+                    const SizedBox(width: 4),
+                    Text('${order.driverInfo!.fullName} ',
+                        style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary)),
+                    const Icon(Icons.star, size: 12, color: Colors.amber),
+                    const SizedBox(width: 2),
+                    Text(order.driverInfo!.rating.toStringAsFixed(1),
+                        style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary)),
+                  ],
+                ),
               ),
             const SizedBox(height: 8),
             Text('ID: ${order.id.length > 8 ? order.id.substring(0, 8) : order.id}',
@@ -277,12 +308,12 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
       _loadData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Замовлення скасовано')));
+            const SnackBar(content: Text('Замовлення скасовано')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('❌ Помилка: $e')));
+            SnackBar(content: Text('Помилка: $e')));
       }
     }
   }
@@ -344,9 +375,23 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
           name.isNotEmpty ? name : phone,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
-        subtitle: Text(
-          '📞 $phone  •  ★${rating.toStringAsFixed(1)}  •  $trips поїздок',
-          style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            children: [
+              const Icon(Icons.phone, size: 12, color: CLIXTheme.textSecondary),
+              const SizedBox(width: 4),
+              Text(phone, style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary)),
+              const SizedBox(width: 8),
+              const Icon(Icons.star, size: 12, color: Colors.amber),
+              const SizedBox(width: 2),
+              Text(rating.toStringAsFixed(1), style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary)),
+              const SizedBox(width: 8),
+              const Icon(Icons.local_taxi, size: 12, color: CLIXTheme.textSecondary),
+              const SizedBox(width: 4),
+              Text('$trips поїздок', style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary)),
+            ],
+          ),
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -374,26 +419,61 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
   // TAB MAP: Карта водіїв
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildMapTab() {
-    final markers = _onlineDrivers.where((d) => d['current_lat'] != null && d['current_lng'] != null).map((d) {
-      return Marker(
-        point: latlong.LatLng((d['current_lat'] as num).toDouble(), (d['current_lng'] as num).toDouble()),
-        width: 60,
-        height: 60,
-        child: GestureDetector(
-          onTap: () {
-            showDialog(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: Text('${d['first_name'] ?? ''} ${d['last_name'] ?? ''}'),
-                content: Text('📞 ${d['phone_number']}\n★ ${d['rating']}\nПоїздок: ${d['total_trips']}'),
-                actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
-              ),
-            );
-          },
-          child: const Icon(Icons.local_taxi, color: CLIXTheme.primary, size: 36),
-        ),
-      );
-    }).toList();
+    final markers = <Marker>[];
+    for (final d in _onlineDrivers) {
+      final lat = double.tryParse(d['current_lat']?.toString() ?? '');
+      final lng = double.tryParse(d['current_lng']?.toString() ?? '');
+      if (lat != null && lng != null) {
+        markers.add(
+          Marker(
+            point: latlong.LatLng(lat, lng),
+            width: 60,
+            height: 60,
+            child: GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: Text('${d['first_name'] ?? ''} ${d['last_name'] ?? ''}'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.phone, size: 16, color: CLIXTheme.textSecondary),
+                            const SizedBox(width: 8),
+                            Text(d['phone_number'] ?? ''),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.star, size: 16, color: Colors.amber),
+                            const SizedBox(width: 8),
+                            Text('Рейтинг: ${d['rating'] ?? '5.0'}'),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.local_taxi, size: 16, color: CLIXTheme.textSecondary),
+                            const SizedBox(width: 8),
+                            Text('Поїздок: ${d['total_trips'] ?? '0'}'),
+                          ],
+                        ),
+                      ],
+                    ),
+                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+                  ),
+                );
+              },
+              child: const Icon(Icons.local_taxi, color: CLIXTheme.primary, size: 36),
+            ),
+          ),
+        );
+      }
+    }
 
     return FlutterMap(
       options: MapOptions(
@@ -451,8 +531,14 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
                     children: [
                       Text(driverName,
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                      Text('📞 $driverPhone',
-                          style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary)),
+                      Row(
+                        children: [
+                          const Icon(Icons.phone, size: 12, color: CLIXTheme.textSecondary),
+                          const SizedBox(width: 4),
+                          Text(driverPhone,
+                              style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary)),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -546,10 +632,19 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
   }
 
   void _showDocumentViewer(String title, String path) {
-    // Build full URL if it's a relative path
-    final imageUrl = path.startsWith('http')
-        ? path
-        : '${ApiConfig.mediaUrl}/$path';
+    String imageUrl = path;
+    if (!path.startsWith('http')) {
+      final uri = Uri.parse(ApiConfig.baseUrl);
+      final host = "${uri.scheme}://${uri.host}:${uri.port}";
+      if (path.startsWith('/media/')) {
+        imageUrl = '$host$path';
+      } else if (path.startsWith('media/')) {
+        imageUrl = '$host/$path';
+      } else {
+        final mediaBase = ApiConfig.mediaUrl.endsWith('/') ? ApiConfig.mediaUrl : '${ApiConfig.mediaUrl}/';
+        imageUrl = '$mediaBase$path';
+      }
+    }
 
     showDialog(
       context: context,
@@ -662,9 +757,8 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
       await _api.reviewKyc(kycId, status);
       _loadData();
       if (mounted) {
-        final emoji = status == 'APPROVED' ? '✅' : '❌';
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$emoji Статус KYC змінено на $status')));
+            SnackBar(content: Text('Статус KYC змінено на $status')));
       }
     } catch (e) {
       if (mounted) {
@@ -753,7 +847,14 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
                 leading: const Icon(Icons.warning_amber, color: CLIXTheme.error),
-                title: Text('Оцінка: ★${c['rating']}'),
+                title: Row(
+                  children: [
+                    const Text('Оцінка: '),
+                    const Icon(Icons.star, size: 14, color: Colors.amber),
+                    const SizedBox(width: 2),
+                    Text('${c['rating']}'),
+                  ],
+                ),
                 subtitle: Text(c['comment'] ?? 'Без коментаря',
                     maxLines: 2, overflow: TextOverflow.ellipsis),
               ),
@@ -940,8 +1041,17 @@ class _ForceAssignSheet extends StatelessWidget {
                   ),
                   title: Text(name.isNotEmpty ? name : phone,
                       style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text('★${rating.toStringAsFixed(1)}  •  $phone',
-                      style: const TextStyle(fontSize: 12)),
+                  subtitle: Row(
+                    children: [
+                      const Icon(Icons.star, size: 12, color: Colors.amber),
+                      const SizedBox(width: 2),
+                      Text(rating.toStringAsFixed(1), style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.phone, size: 12, color: CLIXTheme.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(phone, style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
                   trailing: ElevatedButton(
                     onPressed: () async {
                       try {

@@ -13,12 +13,17 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController(text: '+380');
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLogin = true; // true = вхід, false = реєстрація
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -30,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleSubmit() async {
+    print('DEBUG: _handleSubmit called - phone: ${_phoneController.text}, password: ${_passwordController.text}');
     final auth = context.read<AuthProvider>();
     final phone = _phoneController.text.replaceAll(RegExp(r'\s+'), '');
     final password = _passwordController.text.trim();
@@ -142,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('🇺🇦', style: const TextStyle(fontSize: 20)),
+                            const Icon(Icons.phone, color: CLIXTheme.primary, size: 18),
                             const SizedBox(width: 8),
                           ],
                         ),

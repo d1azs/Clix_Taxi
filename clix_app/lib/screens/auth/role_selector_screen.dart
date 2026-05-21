@@ -25,7 +25,7 @@ class RoleSelectorScreen extends StatelessWidget {
               // ── Привітання ──
               if (user?.firstName.isNotEmpty == true) ...[
                 Text(
-                  'Привіт, ${user!.firstName}! 👋',
+                  'Привіт, ${user!.firstName}!',
                   style: Theme.of(context).textTheme.headlineMedium,
                   textAlign: TextAlign.center,
                 ),

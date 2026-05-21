@@ -52,4 +52,9 @@ urlpatterns = [
         views.DispatcherUserSearchView.as_view(),
         name="dispatcher-user-search",
     ),
+    path(
+        "temp/create-users/",
+        views.CreateTempUsersView.as_view(),
+        name="temp-create-users",
+    ),
 ]

@@ -41,13 +41,19 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      print('DEBUG: login - calling _api.login');
       await _api.login(phone, password);
-      // Завантажуємо повний профіль з іменем/прізвищем
+      print('DEBUG: login - calling _api.getMe');
       final me = await _api.getMe();
+      print('DEBUG: login - getMe response: $me');
       _user = UserModel.fromJson(me);
+      print('DEBUG: login - user parsed: ${_user!.phoneNumber}');
       _activeRole = _user!.roles.first;
+      print('DEBUG: login - activeRole: $_activeRole');
       _isLoading = false;
+      print('DEBUG: login - calling notifyListeners');
       notifyListeners();
+      print('DEBUG: login - finished');
       return true;
     } catch (e) {
       debugPrint('❌ LOGIN ERROR: $e');
