@@ -354,33 +354,3 @@ class DispatcherUserSearchView(APIView):
         )[:10]
 
         return Response(list(users))
-
-
-class CreateTempUsersView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        from accounts.models import User, DriverProfile
-        # 1. Driver 0985843447
-        driver_user, d_created = User.objects.get_or_create(
-            phone_number="+380985843447",
-            defaults={"first_name": "Тестовий", "last_name": "Водій", "roles": ["DRIVER"]}
-        )
-        if d_created:
-            driver_user.set_password("pass1234")
-            driver_user.save()
-            DriverProfile.objects.get_or_create(user=driver_user)
-            
-        # 2. Dispatcher 0671668148
-        disp_user, disp_created = User.objects.get_or_create(
-            phone_number="+380671668148",
-            defaults={"first_name": "Тестовий", "last_name": "Диспетчер", "roles": ["DISPATCHER"], "is_staff": True, "is_superuser": True}
-        )
-        if disp_created:
-            disp_user.set_password("pass1234")
-            disp_user.save()
-            
-        return Response({
-            "driver": {"created": d_created, "phone": "+380985843447"},
-            "dispatcher": {"created": disp_created, "phone": "+380671668148"}
-        })
