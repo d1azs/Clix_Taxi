@@ -49,12 +49,15 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       final lastName = _lastNameController.text.trim();
-      await auth.register(
+      final ok = await auth.register(
         phone: phone,
         password: password,
         firstName: firstName,
         lastName: lastName.isNotEmpty ? lastName : null,
       );
+      if (!ok && mounted) {
+        _showError(auth.error ?? 'Помилка реєстрації. Перевірте дані.');
+      }
     }
   }
 
