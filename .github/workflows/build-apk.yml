@@ -28,6 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd clix_app
+          echo "GOOGLE_MAPS_API_KEY=YOUR_API_KEY_HERE" > .env
           flutter pub get
 
       - name: Build APK
