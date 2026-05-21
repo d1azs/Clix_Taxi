@@ -31,6 +31,13 @@ urlpatterns = [
         name="passenger-order-dismiss-rating",
     ),
 
+    # ── Nearby Drivers (для маркерів на карті) ──
+    path(
+        "drivers/nearby/",
+        views.NearbyDriversView.as_view(),
+        name="drivers-nearby",
+    ),
+
     # ── Водій ──
     path(
         "driver/orders/active/",
@@ -78,6 +85,31 @@ urlpatterns = [
         views.DispatcherComplaintsView.as_view(),
         name="dispatcher-complaints",
     ),
+    path(
+        "dispatcher/orders/<uuid:pk>/force-assign/",
+        views.DispatcherForceAssignView.as_view(),
+        name="dispatcher-force-assign",
+    ),
+    path(
+        "dispatcher/orders/<uuid:pk>/override/",
+        views.DispatcherFareOverrideView.as_view(),
+        name="dispatcher-fare-override",
+    ),
+    path(
+        "dispatcher/drivers/",
+        views.DispatcherDriverListView.as_view(),
+        name="dispatcher-drivers",
+    ),
+    path(
+        "dispatcher/queues/",
+        views.DispatcherQueueView.as_view(),
+        name="dispatcher-queues",
+    ),
+    path(
+        "dispatcher/queues/<uuid:pk>/entries/",
+        views.DispatcherQueueView.as_view(),
+        name="dispatcher-queue-entries",
+    ),
     # ── Спільне ──
     path(
         "orders/history/",
@@ -88,5 +120,11 @@ urlpatterns = [
         "orders/<uuid:pk>/review/",
         views.CreateReviewView.as_view(),
         name="order-review",
+    ),
+    # ── Ціноутворення ──
+    path(
+        "orders/quote/",
+        views.PriceQuoteView.as_view(),
+        name="price-quote",
     ),
 ]

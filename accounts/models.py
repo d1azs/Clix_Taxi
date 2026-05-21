@@ -49,7 +49,6 @@ class UserManager(BaseUserManager):
 # ---------------------------------------------------------------------------
 class User(AbstractBaseUser, PermissionsMixin):
     """Кастомний користувач CLIX — аутентифікація за номером телефону."""
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     phone_number = models.CharField(
         max_length=20,
@@ -149,3 +148,113 @@ class DriverProfile(models.Model):
 
     def __str__(self):
         return f"Водій: {self.user.phone_number} ({self.status})"
+
+
+# ---------------------------------------------------------------------------
+# Статус KYC документа
+# ---------------------------------------------------------------------------
+class KYCStatus(models.TextChoices):
+    PENDING = "PENDING", "На перевірці"
+    APPROVED = "APPROVED", "Затверджено"
+    REJECTED = "REJECTED", "Відхилено"
+
+
+# ---------------------------------------------------------------------------
+# KYC документи водія
+# ---------------------------------------------------------------------------
+class KYCDocument(models.Model):
+    """Документи верифікації водія: ID, права, реєстрація авто."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    driver = models.ForeignKey(
+        DriverProfile,
+        on_delete=models.CASCADE,
+        related_name="kyc_documents",
+        verbose_name="Водій",
+    )
+    id_card = models.ImageField(
+        upload_to="kyc/id_cards/",
+        null=True,
+        blank=True,
+        verbose_name="Посвідчення особи",
+    )
+    license = models.ImageField(
+        upload_to="kyc/licenses/",
+        null=True,
+        blank=True,
+        verbose_name="Водійське посвідчення",
+    )
+    registration = models.ImageField(
+        upload_to="kyc/registrations/",
+        null=True,
+        blank=True,
+        verbose_name="Реєстрація транспорту",
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=KYCStatus.choices,
+        default=KYCStatus.PENDING,
+        verbose_name="Статус верифікації",
+    )
+    feedback_note = models.TextField(
+        blank=True,
+        verbose_name="Коментар модератора",
+        help_text="Причина відхилення або додаткова інформація",
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True, verbose_name="Подано")
+    reviewed_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Перевірено"
+    )
+
+    class Meta:
+        verbose_name = "KYC документ"
+        verbose_name_plural = "KYC документи"
+        ordering = ["-submitted_at"]
+
+    def __str__(self):
+        return f"KYC {self.driver.user.phone_number} — {self.get_status_display()}"
+
+
+# ---------------------------------------------------------------------------
+# Рейтинг / Ранкінг водія (алгоритмічний)
+# ---------------------------------------------------------------------------
+class DriverRanking(models.Model):
+    """Алгоритмічний рейтинг водія на основі швидкості прийняття та оцінок."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    driver = models.OneToOneField(
+        DriverProfile,
+        on_delete=models.CASCADE,
+        related_name="ranking",
+        verbose_name="Водій",
+    )
+    acceptance_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=100.00,
+        verbose_name="Швидкість прийняття (%)",
+        help_text="Відсоток прийнятих замовлень від загальної кількості",
+    )
+    avg_response_time = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0.00,
+        verbose_name="Середній час відповіді (с)",
+    )
+    composite_score = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=50.00,
+        verbose_name="Композитний скор",
+        help_text="Агрегований скор для визначення пріоритету",
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Оновлено")
+
+    class Meta:
+        verbose_name = "Ранкінг водія"
+        verbose_name_plural = "Ранкінги водіїв"
+        ordering = ["-composite_score"]
+
+    def __str__(self):
+        return f"Ранкінг: {self.driver.user.phone_number} — {self.composite_score}"
+

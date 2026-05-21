@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import DriverStatus, User
-from accounts.permissions import IsDispatcher, IsDriver, IsPassenger
+from accounts.permissions import IsDispatcher, IsDriver, IsKYCApproved, IsPassenger
 from vehicles.models import Vehicle
 
 from .models import Order, OrderStatus, Review
@@ -24,6 +24,7 @@ from .serializers import (
     PassengerOrderCreateSerializer,
     ReviewSerializer,
 )
+from .signals import broadcast_new_order, broadcast_order_status
 
 
 def _calculate_price(
@@ -79,6 +80,7 @@ class PassengerOrderCreateView(generics.CreateAPIView):
                 order.required_class,
             )
             order.save(update_fields=["estimated_price"])
+        broadcast_new_order(order)
 
 
 class PassengerActiveOrderView(APIView):
@@ -172,6 +174,15 @@ class PassengerCancelOrderView(APIView):
             )
         order.status = OrderStatus.CANCELLED
         order.save(update_fields=["status"])
+
+        # Audit log
+        from .models import CancellationLog, CancellationReason
+        CancellationLog.objects.create(
+            order=order,
+            cancelled_by=request.user,
+            reason=CancellationReason.PASSENGER_REQUEST,
+        )
+        broadcast_order_status(order)
         return Response({"detail": "Замовлення скасовано"})
 
 
@@ -216,10 +227,11 @@ class AvailableOrdersView(generics.ListAPIView):
     """
     GET /api/orders/available/ — Радар: доступні PENDING-замовлення для водія.
     Фільтрує за класом авто та опціями водія.
+    KYC-верифікація обов'язкова.
     """
 
     serializer_class = OrderSerializer
-    permission_classes = [IsDriver]
+    permission_classes = [IsDriver, IsKYCApproved]
 
     def get_queryset(self):
         driver_profile = self.request.user.driver_profile
@@ -288,6 +300,7 @@ class AcceptOrderView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        broadcast_order_status(order)
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
 
@@ -360,8 +373,12 @@ class UpdateOrderStatusView(APIView):
             if order.estimated_price:
                 driver_profile.total_earnings += order.estimated_price
             driver_profile.save()
+            # Перерахунок ранкінгу
+            from .ranking_service import recalculate_driver_ranking
+            recalculate_driver_ranking(driver_profile)
 
         order.save()
+        broadcast_order_status(order)
         return Response(OrderSerializer(order).data)
 
 
@@ -397,6 +414,7 @@ class DispatcherOrderCreateView(generics.CreateAPIView):
                 order.required_class,
             )
             order.save(update_fields=["estimated_price"])
+        broadcast_new_order(order)
 
 
 class DispatcherOrderListView(generics.ListAPIView):
@@ -444,6 +462,159 @@ class DispatcherComplaintsView(generics.ListAPIView):
         return Review.objects.filter(is_complaint=True).select_related(
             "order", "author", "target_driver"
         )
+
+
+class DispatcherForceAssignView(APIView):
+    """
+    POST /api/dispatcher/orders/<id>/force-assign/
+    Примусове призначення водія диспетчером.
+    Body: {"driver_profile_id": "<uuid>"}
+    """
+
+    permission_classes = [IsDispatcher]
+
+    def post(self, request, pk):
+        from accounts.models import DriverProfile
+
+        driver_profile_id = request.data.get("driver_profile_id")
+        if not driver_profile_id:
+            return Response(
+                {"error": "driver_profile_id обов'язковий"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            order = Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Замовлення не знайдено"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if order.status not in [OrderStatus.PENDING, OrderStatus.ACCEPTED]:
+            return Response(
+                {"error": f"Неможливо призначити водія для статусу {order.status}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            driver = DriverProfile.objects.get(pk=driver_profile_id)
+        except DriverProfile.DoesNotExist:
+            return Response(
+                {"error": "Водій не знайдений"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        order.driver = driver
+        order.status = OrderStatus.ACCEPTED
+        order.accepted_at = timezone.now()
+        order.save()
+
+        broadcast_order_status(order)
+        return Response(OrderSerializer(order).data)
+
+
+class DispatcherFareOverrideView(APIView):
+    """
+    PATCH /api/dispatcher/orders/<id>/override/
+    Диспетчер коригує ціну або комісію замовлення.
+    Body: {"upfront_price": "150.00", "commission_deduction": "15.00"}
+    """
+
+    permission_classes = [IsDispatcher]
+
+    def patch(self, request, pk):
+        try:
+            order = Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Замовлення не знайдено"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        upfront = request.data.get("upfront_price")
+        commission = request.data.get("commission_deduction")
+        estimated = request.data.get("estimated_price")
+
+        update_fields = []
+        if upfront is not None:
+            order.upfront_price = upfront
+            update_fields.append("upfront_price")
+        if commission is not None:
+            order.commission_deduction = commission
+            update_fields.append("commission_deduction")
+        if estimated is not None:
+            order.estimated_price = estimated
+            update_fields.append("estimated_price")
+
+        if update_fields:
+            order.save(update_fields=update_fields)
+
+        return Response(OrderSerializer(order).data)
+
+
+class DispatcherDriverListView(APIView):
+    """
+    GET /api/dispatcher/drivers/ — Повний список водіїв з координатами та статусами.
+    """
+
+    permission_classes = [IsDispatcher]
+
+    def get(self, request):
+        from accounts.models import DriverProfile
+        from accounts.serializers import DriverProfileSerializer
+
+        profiles = DriverProfile.objects.select_related("user").all()
+
+        # Фільтр за статусом
+        driver_status = request.query_params.get("status")
+        if driver_status:
+            profiles = profiles.filter(status=driver_status)
+
+        serializer = DriverProfileSerializer(profiles, many=True)
+        return Response(serializer.data)
+
+
+class DispatcherQueueView(APIView):
+    """
+    GET /api/dispatcher/queues/ — Список віртуальних черг.
+    GET /api/dispatcher/queues/<id>/entries/ — Водії у черзі.
+    """
+
+    permission_classes = [IsDispatcher]
+
+    def get(self, request, pk=None):
+        from .models import VirtualQueue, VirtualQueueEntry
+
+        if pk:
+            entries = VirtualQueueEntry.objects.filter(
+                queue_id=pk
+            ).select_related("driver", "driver__user").order_by("position")
+            data = [
+                {
+                    "position": e.position,
+                    "driver_id": str(e.driver.id),
+                    "driver_phone": e.driver.user.phone_number,
+                    "driver_name": f"{e.driver.user.first_name} {e.driver.user.last_name}".strip(),
+                    "joined_at": e.joined_at.isoformat(),
+                }
+                for e in entries
+            ]
+            return Response(data)
+
+        queues = VirtualQueue.objects.filter(is_active=True)
+        data = [
+            {
+                "id": str(q.id),
+                "name": q.name,
+                "lat": q.lat,
+                "lng": q.lng,
+                "radius_meters": q.radius_meters,
+                "active_drivers": q.entries.count(),
+            }
+            for q in queues
+        ]
+        return Response(data)
 
 
 # ╔═════════════════════════════════════════════════════════════════════════╗
@@ -509,3 +680,69 @@ class CreateReviewView(generics.CreateAPIView):
         weighted_avg = (5 * 5.0 + review_sum) / (5 + review_count)
         driver.rating = round(weighted_avg, 2)
         driver.save(update_fields=["rating"])
+
+
+# ╔═════════════════════════════════════════════════════════════════════════╗
+# ║                    ЦІНОУТВОРЕННЯ (Pricing Quote)                      ║
+# ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+class PriceQuoteView(APIView):
+    """
+    POST /api/orders/quote/ — Прозорий розрахунок ціни для всіх класів авто.
+    Body: {"pickup_lat": 50.07, "pickup_lng": 14.43, "dropoff_lat": 50.10, "dropoff_lng": 14.48}
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        lat1 = request.data.get("pickup_lat")
+        lng1 = request.data.get("pickup_lng")
+        lat2 = request.data.get("dropoff_lat")
+        lng2 = request.data.get("dropoff_lng")
+
+        if None in (lat1, lng1, lat2, lng2):
+            return Response(
+                {"error": "Необхідні поля: pickup_lat, pickup_lng, dropoff_lat, dropoff_lng"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .pricing import compute_all_classes
+
+        quotes = compute_all_classes(
+            float(lat1), float(lng1), float(lat2), float(lng2)
+        )
+        return Response(quotes)
+
+
+# ╔═════════════════════════════════════════════════════════════════════════╗
+# ║           NEARBY DRIVERS (для маркерів на карті пасажира)             ║
+# ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+class NearbyDriversView(APIView):
+    """GET /api/drivers/nearby/ — Координати онлайн-водіїв (для карти)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from accounts.models import DriverProfile
+
+        drivers = DriverProfile.objects.filter(
+            status=DriverStatus.ONLINE,
+            current_lat__isnull=False,
+            current_lng__isnull=False,
+        ).select_related("user")
+
+        data = [
+            {
+                "id": str(d.id),
+                "lat": float(d.current_lat),
+                "lng": float(d.current_lng),
+                "first_name": d.user.first_name,
+            }
+            for d in drivers
+        ]
+        return Response(data)
+
+

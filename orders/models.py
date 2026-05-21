@@ -107,6 +107,27 @@ class Order(models.Model):
         blank=True,
         verbose_name="Орієнтовна ціна (Kč)",
     )
+    upfront_price = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Фіксована ціна (Kč)",
+        help_text="Фінальна зафіксована ціна, показана до підтвердження",
+    )
+    commission_deduction = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=0.00,
+        verbose_name="Комісія платформи (Kč)",
+    )
+    calculated_distance = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Розрахована відстань (км)",
+    )
 
     # Маршрут (Polyline для побудови маршруту на карті)
     route_polyline = models.TextField(
@@ -178,3 +199,118 @@ class Review(models.Model):
     def __str__(self):
         kind = "Скарга" if self.is_complaint else "Відгук"
         return f"{kind} на замовлення {self.order_id.__str__()[:8]} — ★{self.rating}"
+
+
+# ---------------------------------------------------------------------------
+# Віртуальна черга (наприклад, аеропорт)
+# ---------------------------------------------------------------------------
+class VirtualQueue(models.Model):
+    """Зона з FIFO-чергою для водіїв (аеропорт, вокзал тощо)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Назва зони",
+        help_text="Наприклад: Аеропорт Вацлава Гавела",
+    )
+    lat = models.FloatField(verbose_name="Широта центру зони")
+    lng = models.FloatField(verbose_name="Довгота центру зони")
+    radius_meters = models.PositiveIntegerField(
+        default=2000,
+        verbose_name="Радіус геозони (м)",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Активна")
+
+    class Meta:
+        verbose_name = "Віртуальна черга"
+        verbose_name_plural = "Віртуальні черги"
+
+    def __str__(self):
+        return self.name
+
+
+class VirtualQueueEntry(models.Model):
+    """Запис водія у віртуальній черзі (FIFO)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    queue = models.ForeignKey(
+        VirtualQueue,
+        on_delete=models.CASCADE,
+        related_name="entries",
+        verbose_name="Черга",
+    )
+    driver = models.ForeignKey(
+        "accounts.DriverProfile",
+        on_delete=models.CASCADE,
+        related_name="queue_entries",
+        verbose_name="Водій",
+    )
+    position = models.PositiveIntegerField(verbose_name="Позиція в черзі")
+    joined_at = models.DateTimeField(auto_now_add=True, verbose_name="Вступив у чергу")
+
+    class Meta:
+        verbose_name = "Запис у черзі"
+        verbose_name_plural = "Записи у черзі"
+        ordering = ["position"]
+        unique_together = ["queue", "driver"]
+
+    def __str__(self):
+        return f"#{self.position} — {self.driver.user.phone_number} @ {self.queue.name}"
+
+
+# ---------------------------------------------------------------------------
+# Лог скасувань (для refund-аудиту)
+# ---------------------------------------------------------------------------
+class CancellationReason(models.TextChoices):
+    PASSENGER_REQUEST = "PASSENGER_REQUEST", "Пасажир скасував"
+    DRIVER_REQUEST = "DRIVER_REQUEST", "Водій скасував"
+    NO_DRIVERS = "NO_DRIVERS", "Таймаут — водії не знайдені"
+    DISPATCHER_OVERRIDE = "DISPATCHER_OVERRIDE", "Диспетчер скасував"
+    SYSTEM = "SYSTEM", "Системне скасування"
+
+
+class CancellationLog(models.Model):
+    """Лог скасування замовлення з деталями для аудиту та refund-процесу."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.OneToOneField(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="cancellation_log",
+        verbose_name="Замовлення",
+    )
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Хто скасував",
+    )
+    reason = models.CharField(
+        max_length=25,
+        choices=CancellationReason.choices,
+        default=CancellationReason.PASSENGER_REQUEST,
+        verbose_name="Причина",
+    )
+    note = models.TextField(blank=True, verbose_name="Додаткова інформація")
+    refund_amount = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=0.00,
+        verbose_name="Сума повернення (Kč)",
+    )
+    refund_processed = models.BooleanField(
+        default=False,
+        verbose_name="Повернення оброблено",
+    )
+    cancelled_at = models.DateTimeField(auto_now_add=True, verbose_name="Скасовано")
+
+    class Meta:
+        verbose_name = "Лог скасування"
+        verbose_name_plural = "Логи скасувань"
+        ordering = ["-cancelled_at"]
+
+    def __str__(self):
+        return f"Скасування {self.order_id.__str__()[:8]} — {self.get_reason_display()}"
+

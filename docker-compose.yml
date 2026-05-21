@@ -1,0 +1,40 @@
+# =============================================================================
+# CLIX Taxi — Docker Compose (PostgreSQL + Redis)
+# =============================================================================
+# Usage: docker compose up -d
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: clix_postgres
+    environment:
+      POSTGRES_DB: clix_db
+      POSTGRES_USER: clix_user
+      POSTGRES_PASSWORD: clix_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - clix_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clix_user -d clix_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: clix_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - clix_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  clix_pg_data:
+  clix_redis_data:

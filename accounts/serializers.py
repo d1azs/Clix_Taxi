@@ -5,14 +5,14 @@ accounts/serializers.py — Серіалайзери для аутентифік
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import DriverProfile, User
+from .models import DriverProfile, DriverRanking, KYCDocument, User
 
 
 # ---------------------------------------------------------------------------
 # JWT: додаємо ролі до токена
 # ---------------------------------------------------------------------------
 class CLIXTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Кастомний серіалайзер — додає roles до JWT-відповіді."""
+    """Кастомний серіалайзер — додає roles, kyc_status до JWT-відповіді."""
 
     username_field = "phone_number"
 
@@ -21,6 +21,21 @@ class CLIXTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
         token["roles"] = user.roles
         token["phone"] = user.phone_number
+        token["first_name"] = user.first_name
+
+        # KYC статус для водія — клієнт може перевірити без запиту
+        if user.has_role("DRIVER") and hasattr(user, "driver_profile"):
+            from .models import KYCDocument
+
+            latest_kyc = (
+                KYCDocument.objects.filter(driver=user.driver_profile)
+                .order_by("-submitted_at")
+                .first()
+            )
+            token["kyc_status"] = latest_kyc.status if latest_kyc else "NOT_SUBMITTED"
+        else:
+            token["kyc_status"] = None
+
         return token
 
     def validate(self, attrs):
@@ -28,6 +43,19 @@ class CLIXTokenObtainPairSerializer(TokenObtainPairSerializer):
         data["roles"] = self.user.roles
         data["user_id"] = str(self.user.id)
         data["phone_number"] = self.user.phone_number
+        data["first_name"] = self.user.first_name
+
+        # KYC статус у відповіді логіну
+        if self.user.has_role("DRIVER") and hasattr(self.user, "driver_profile"):
+            from .models import KYCDocument
+
+            latest_kyc = (
+                KYCDocument.objects.filter(driver=self.user.driver_profile)
+                .order_by("-submitted_at")
+                .first()
+            )
+            data["kyc_status"] = latest_kyc.status if latest_kyc else "NOT_SUBMITTED"
+
         return data
 
 
@@ -68,6 +96,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     """Серіалайзер поточного користувача."""
 
+    kyc_status = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -76,9 +106,22 @@ class UserSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "roles",
+            "kyc_status",
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_kyc_status(self, obj):
+        if obj.has_role("DRIVER") and hasattr(obj, "driver_profile"):
+            from .models import KYCDocument
+
+            latest_kyc = (
+                KYCDocument.objects.filter(driver=obj.driver_profile)
+                .order_by("-submitted_at")
+                .first()
+            )
+            return latest_kyc.status if latest_kyc else "NOT_SUBMITTED"
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -118,3 +161,49 @@ class DriverProfileSerializer(serializers.ModelSerializer):
             "current_lng",
         ]
         read_only_fields = ["id", "rating", "total_trips", "total_earnings"]
+
+
+# ---------------------------------------------------------------------------
+# KYC документи
+# ---------------------------------------------------------------------------
+class KYCUploadSerializer(serializers.ModelSerializer):
+    """Серіалайзер для завантаження KYC документів водієм."""
+
+    class Meta:
+        model = KYCDocument
+        fields = ["id", "id_card", "license", "registration", "status", "feedback_note", "submitted_at", "reviewed_at"]
+        read_only_fields = ["id", "status", "feedback_note", "submitted_at", "reviewed_at"]
+
+
+class KYCReviewSerializer(serializers.ModelSerializer):
+    """Серіалайзер для перевірки KYC диспетчером."""
+
+    driver_phone = serializers.CharField(source="driver.user.phone_number", read_only=True)
+    driver_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KYCDocument
+        fields = [
+            "id", "driver", "driver_phone", "driver_name",
+            "id_card", "license", "registration",
+            "status", "feedback_note",
+            "submitted_at", "reviewed_at",
+        ]
+        read_only_fields = ["id", "driver", "driver_phone", "driver_name", "id_card", "license", "registration", "submitted_at"]
+
+    def get_driver_name(self, obj):
+        u = obj.driver.user
+        return f"{u.first_name} {u.last_name}".strip() or u.phone_number
+
+
+# ---------------------------------------------------------------------------
+# Ранкінг водія
+# ---------------------------------------------------------------------------
+class DriverRankingSerializer(serializers.ModelSerializer):
+    """Серіалайзер алгоритмічного ранкінгу."""
+
+    class Meta:
+        model = DriverRanking
+        fields = ["id", "acceptance_rate", "avg_response_time", "composite_score", "updated_at"]
+        read_only_fields = fields
+

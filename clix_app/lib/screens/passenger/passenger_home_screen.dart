@@ -59,6 +59,26 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   bool _showPickupSuggestions = false;
   bool _showDropoffSuggestions = false;
   DateTime? _scheduledTime;
+  Map<String, double> _priceQuotes = {}; // NEW: backend prices
+
+  Future<void> _fetchQuotes() async {
+    if (_selectedPickup == null || _selectedDropoff == null) return;
+    try {
+      final quotes = await _api.getPricingQuotes(
+        pickupLat: _selectedPickup!.lat,
+        pickupLng: _selectedPickup!.lng,
+        dropoffLat: _selectedDropoff!.lat,
+        dropoffLng: _selectedDropoff!.lng,
+      );
+      if (mounted) {
+        setState(() {
+          _priceQuotes = {
+            for (var q in quotes) q['car_class']: double.tryParse(q['total_price']?.toString() ?? '0') ?? 0.0
+          };
+        });
+      }
+    } catch (_) {}
+  }
 
   // Карта
   final MapController _mapController = MapController();
@@ -71,6 +91,10 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   List<LatLng> _routePoints = []; // повний маршрут (pickup -> dropoff)
   List<LatLng> _demoRouteToDriver = []; // маршрут до водія (ACCEPTED фаза)
   List<LatLng> _visibleRoute = []; // поточна видима частина маршруту
+
+  // Nearby drivers on map
+  List<Map<String, dynamic>> _nearbyDrivers = [];
+  Timer? _nearbyDriversTimer;
 
   static const _mapStyles = [
     {
@@ -90,6 +114,17 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     super.initState();
     _checkActiveOrder();
     _initGeolocation();
+    _fetchNearbyDrivers();
+    _nearbyDriversTimer = Timer.periodic(const Duration(seconds: 30), (_) => _fetchNearbyDrivers());
+  }
+
+  Future<void> _fetchNearbyDrivers() async {
+    try {
+      final drivers = await _api.getNearbyDrivers();
+      if (mounted) {
+        setState(() => _nearbyDrivers = List<Map<String, dynamic>>.from(drivers));
+      }
+    } catch (_) {}
   }
 
   void _startOrderPolling() {
@@ -101,8 +136,19 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
         if (!mounted) return;
         if (data == null) {
           _stopDemoAnimation();
+          if (mounted && _lastStatus == 'PENDING') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('На жаль, поруч немає вільних водіїв. Спробуйте пізніше або підвищіть клас авто.'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: CLIXTheme.error,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
           setState(() {
             _activeOrder = null;
+            _lastStatus = null;
             _driverLocation = null;
             _visibleRoute = [];
             _demoRouteToDriver = [];
@@ -790,6 +836,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     _orderTimer?.cancel();
     _debounce?.cancel();
     _demoAnimationTimer?.cancel();
+    _nearbyDriversTimer?.cancel();
     _pickupController.dispose();
     _dropoffController.dispose();
     _mapController.dispose();
@@ -850,6 +897,10 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   /// Побудувати маршрут між pickup і dropoff.
   Future<void> _tryBuildRoute() async {
     if (_selectedPickup == null || _selectedDropoff == null) return;
+    
+    // Новий функціонал: отримуємо ціну з бекенду (Transparent Pricing)
+    _fetchQuotes();
+    
     final from = LatLng(_selectedPickup!.lat, _selectedPickup!.lng);
     final to = LatLng(_selectedDropoff!.lat, _selectedDropoff!.lng);
     final points = await _routing.getRoute(from, to);
@@ -991,6 +1042,32 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                 ),
               MarkerLayer(
                 markers: [
+                  // Nearby drivers — показуємо коли немає активного замовлення
+                  if (_activeOrder == null)
+                    ..._nearbyDrivers.map((d) {
+                      final lat = (d['lat'] as num?)?.toDouble();
+                      final lng = (d['lng'] as num?)?.toDouble();
+                      if (lat == null || lng == null) return null;
+                      return Marker(
+                        point: LatLng(lat, lng),
+                        width: 32,
+                        height: 32,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.local_taxi, color: Color(0xFF5E48E8), size: 18),
+                        ),
+                      );
+                    }).whereType<Marker>(),
                   // Моя локація — прибираємо коли вже в машині
                   if (_userLocation != null &&
                       _activeOrder?.status != 'IN_PROGRESS' &&
@@ -1440,30 +1517,70 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Кнопка виклику
-              SizedBox(
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _createOrder,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
-                          ),
-                        )
-                      : Text(
-                          _scheduledTime != null
-                              ? 'Запланувати таксі'
-                              : 'Викликати таксі!',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
+              // Заглушка Apple Pay та замовлення
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: SizedBox(
+                      height: 54,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: CLIXTheme.divider),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(CLIXTheme.radiusMd)),
                         ),
-                ),
+                        onPressed: () {
+                           // Mock cash selection
+                           ScaffoldMessenger.of(context).showSnackBar(
+                             const SnackBar(content: Text('Обрано оплату готівкою'))
+                           );
+                        },
+                        child: const Icon(Icons.money, color: CLIXTheme.success),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 3,
+                    child: SizedBox(
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _createOrder,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black, // Apple Pay Color
+                          foregroundColor: Colors.white,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.apple, size: 22),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _scheduledTime != null
+                                        ? 'Запланувати Pay'
+                                        : 'Pay',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
             ],
@@ -1899,6 +2016,9 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
 
   /// Розрахунок орієнтовної ціни для заданого класу авто.
   double _getEstimatedPrice(CarClass cc) {
+    if (_priceQuotes.containsKey(cc.id)) {
+      return _priceQuotes[cc.id]!;
+    }
     final pickupLat = _selectedPickup?.lat ?? 49.8397;
     final pickupLng = _selectedPickup?.lng ?? 24.0297;
     final dropoffLat = _selectedDropoff?.lat ?? 49.8429;

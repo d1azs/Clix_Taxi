@@ -31,3 +31,18 @@ fix.txt
 
 # Gemini
 .gemini/
+
+# Node caches and docx files
+.npm-cache/
+*.docx
+*.pdf
+*.puml
+*.csv
+*.html
+*.xlsx
+*.txt
+landing-react/
+node_modules/
+**/node_modules/
+
+

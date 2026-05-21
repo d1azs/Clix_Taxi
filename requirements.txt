@@ -1,6 +1,9 @@
 asgiref==3.11.1
 black==26.3.1
+channels==4.2.0
+channels-redis==4.2.1
 click==8.3.1
+dj-database-url==2.3.0
 Django==6.0.2
 django-cors-headers==4.9.0
 django-filter==25.2
@@ -11,8 +14,12 @@ mypy_extensions==1.1.0
 packaging==26.0
 pathspec==1.0.4
 phonenumbers==9.0.24
+Pillow==12.2.0
 platformdirs==4.9.4
 psycopg2-binary==2.9.11
+python-decouple==3.8
 PyJWT==2.11.0
 pytokens==0.4.1
+redis==5.2.1
 sqlparse==0.5.5
+whitenoise==6.8.2

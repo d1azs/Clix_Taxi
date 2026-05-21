@@ -216,6 +216,28 @@ class ApiService {
     await _dio.post(ApiConfig.driverLocation, data: {'lat': lat, 'lng': lng});
   }
 
+  /// Завантажити KYC документи водія
+  Future<Map<String, dynamic>> uploadKycDocuments({
+    required String licensePath,
+    required String idCardPath,
+    required String registrationPath,
+  }) async {
+    final formData = FormData.fromMap({
+      'license': await MultipartFile.fromFile(licensePath),
+      'id_card': await MultipartFile.fromFile(idCardPath),
+      'registration': await MultipartFile.fromFile(registrationPath),
+    });
+    final response = await _dio.post(ApiConfig.kycUpload, data: formData);
+    return response.data;
+  }
+
+  // ── Водії поблизу (для карти пасажира) ──
+
+  Future<List<dynamic>> getNearbyDrivers() async {
+    final response = await _dio.get(ApiConfig.nearbyDrivers);
+    return response.data is List ? response.data : [];
+  }
+
   // ── Замовлення (пасажир) ──
 
   Future<Map<String, dynamic>> createPassengerOrder({
@@ -244,6 +266,24 @@ class ApiService {
       },
     );
     return response.data;
+  }
+
+  Future<List<dynamic>> getPricingQuotes({
+    required double pickupLat,
+    required double pickupLng,
+    required double dropoffLat,
+    required double dropoffLng,
+  }) async {
+    final response = await _dio.post(
+      '${ApiConfig.baseUrl}orders/quote/',
+      data: {
+        'pickup_lat': pickupLat,
+        'pickup_lng': pickupLng,
+        'dropoff_lat': dropoffLat,
+        'dropoff_lng': dropoffLng,
+      },
+    );
+    return response.data['quotes'] ?? [];
   }
 
   Future<Map<String, dynamic>?> getActiveOrder() async {
@@ -348,20 +388,64 @@ class ApiService {
     required double dropoffLng,
     required String pickupTime,
     String requiredClass = 'ECONOMY',
+    String? assignedDriverId,
   }) async {
+    final body = <String, dynamic>{
+      'passenger_phone': passengerPhone,
+      'pickup_address': pickupAddress,
+      'dropoff_address': dropoffAddress,
+      'pickup_lat': pickupLat,
+      'pickup_lng': pickupLng,
+      'dropoff_lat': dropoffLat,
+      'dropoff_lng': dropoffLng,
+      'pickup_time': pickupTime,
+      'required_class': requiredClass,
+    };
+    if (assignedDriverId != null) {
+      body['assigned_driver_id'] = assignedDriverId;
+    }
     final response = await _dio.post(
       ApiConfig.dispatcherCreateOrder,
-      data: {
-        'passenger_phone': passengerPhone,
-        'pickup_address': pickupAddress,
-        'dropoff_address': dropoffAddress,
-        'pickup_lat': pickupLat,
-        'pickup_lng': pickupLng,
-        'dropoff_lat': dropoffLat,
-        'dropoff_lng': dropoffLng,
-        'pickup_time': pickupTime,
-        'required_class': requiredClass,
-      },
+      data: body,
+    );
+    return response.data;
+  }
+
+  // ── Диспетчер: Водії ──
+
+  Future<List<dynamic>> getDispatcherDrivers() async {
+    final response = await _dio.get(ApiConfig.dispatcherDrivers);
+    return response.data is List ? response.data : (response.data['results'] ?? []);
+  }
+
+  // ── Диспетчер: KYC ──
+
+  Future<List<dynamic>> getPendingKyc() async {
+    final response = await _dio.get(ApiConfig.dispatcherKycPending);
+    return response.data is List ? response.data : (response.data['results'] ?? []);
+  }
+
+  Future<Map<String, dynamic>> reviewKyc(String kycId, String status) async {
+    final response = await _dio.patch(
+      ApiConfig.dispatcherKycReview(kycId),
+      data: {'status': status},
+    );
+    return response.data;
+  }
+
+  // ── Диспетчер: Дії із замовленнями ──
+
+  Future<void> cancelDispatcherOrder(String orderId) async {
+    await _dio.patch(
+      ApiConfig.dispatcherOrderDetail(orderId),
+      data: {'status': 'CANCELLED'},
+    );
+  }
+
+  Future<Map<String, dynamic>> forceAssignDriver(String orderId, String driverProfileId) async {
+    final response = await _dio.post(
+      ApiConfig.dispatcherForceAssign(orderId),
+      data: {'driver_profile_id': driverProfileId},
     );
     return response.data;
   }

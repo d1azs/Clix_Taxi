@@ -426,6 +426,124 @@ class _ProfilePage extends StatelessWidget {
     );
   }
 
+  void _showPaymentMethodDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Способи оплати', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.apple),
+              title: const Text('Apple Pay'),
+              trailing: const Icon(Icons.check_circle, color: CLIXTheme.success),
+              tileColor: Colors.grey.shade100,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.money),
+              title: const Text('Готівка'),
+              tileColor: Colors.grey.shade100,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CLIXTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Готово'),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMyRatingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Мої оцінки', textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.star, size: 64, color: Colors.amber),
+            const SizedBox(height: 12),
+            const Text(
+              'Рейтинг: 5.0',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text('Дякуємо, що ви чудовий пасажир!', textAlign: TextAlign.center),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CLIXTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрити'),
+          )
+        ],
+      ),
+    );
+  }
+
+  void _showSupportDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Підтримка'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            ListTile(
+              leading: Icon(Icons.email_outlined, color: CLIXTheme.primary),
+              title: Text('support@clix.taxi'),
+              contentPadding: EdgeInsets.zero,
+            ),
+            ListTile(
+              leading: Icon(Icons.phone_outlined, color: CLIXTheme.primary),
+              title: Text('+380 800 123 456'),
+              contentPadding: EdgeInsets.zero,
+            ),
+            SizedBox(height: 12),
+            Text('Служба підтримки працює 24/7. Звертайтеся з будь-яких питань!',
+              style: TextStyle(fontSize: 13, color: CLIXTheme.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрити'),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -534,17 +652,17 @@ class _ProfilePage extends StatelessWidget {
               _profileTile(
                 icon: Icons.payment_outlined,
                 label: 'Спосіб оплати',
-                onTap: () {},
+                onTap: () => _showPaymentMethodDialog(context),
               ),
               _profileTile(
                 icon: Icons.star_outline,
                 label: 'Мої оцінки',
-                onTap: () {},
+                onTap: () => _showMyRatingsDialog(context),
               ),
               _profileTile(
                 icon: Icons.help_outline,
                 label: 'Підтримка',
-                onTap: () {},
+                onTap: () => _showSupportDialog(context),
               ),
               if (auth.user?.hasMultipleRoles ?? false)
                 _profileTile(

@@ -1,7 +1,8 @@
 /// Конфігурація API для CLIX
 class ApiConfig {
   // Базова URL-адреса бекенду (змінити для продакшну)
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String baseUrl = 'https://clix-taxi.onrender.com/api';
+  static const String mediaUrl = 'https://clix-taxi.onrender.com/media';
 
   // Ендпоінти авторизації
   static const String login = '/auth/login/';
@@ -14,6 +15,7 @@ class ApiConfig {
   static const String driverLocation = '/driver/location/';
   static const String driverVehicles = '/driver/vehicles/';
   static const String driverActiveOrder = '/driver/orders/active/';
+  static const String nearbyDrivers = '/drivers/nearby/';
 
   // Ендпоінти пасажира
   static const String passengerCreateOrder = '/passenger/orders/';
@@ -32,5 +34,13 @@ class ApiConfig {
   static const String dispatcherCreateOrder = '/dispatcher/orders/';
   static const String dispatcherOrderList = '/dispatcher/orders/list/';
   static const String dispatcherComplaints = '/dispatcher/complaints/';
+  static const String dispatcherDrivers = '/dispatcher/drivers/';
+  static const String dispatcherKycPending = '/dispatcher/kyc/pending/';
   static String dispatcherOrderDetail(String id) => '/dispatcher/orders/$id/';
+  static String dispatcherForceAssign(String id) => '/dispatcher/orders/$id/force-assign/';
+  static String dispatcherKycReview(String id) => '/dispatcher/kyc/$id/review/';
+
+  // KYC
+  static const String kycUpload = '/driver/kyc/upload';
+  static const String kycStatus = '/driver/kyc/status';
 }

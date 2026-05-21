@@ -109,11 +109,23 @@ class AuthProvider extends ChangeNotifier {
         firstName: firstName,
         lastName: lastName,
         roles: _user!.roles,
+        kycStatus: _user!.kycStatus,
       );
       notifyListeners();
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Оновити KYC-статус водія (перезапитує /users/me/ з бекенду)
+  Future<void> refreshKycStatus() async {
+    try {
+      final data = await _api.getMe();
+      _user = UserModel.fromJson(data);
+      notifyListeners();
+    } catch (_) {
+      // silent fail
     }
   }
 

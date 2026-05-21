@@ -5,6 +5,7 @@ class UserModel {
   final String firstName;
   final String lastName;
   final List<String> roles;
+  final String kycStatus; // NEW: Для блокування водіїв
 
   UserModel({
     required this.id,
@@ -12,6 +13,7 @@ class UserModel {
     required this.firstName,
     required this.lastName,
     required this.roles,
+    this.kycStatus = 'NOT_SUBMITTED',
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -21,6 +23,7 @@ class UserModel {
       firstName: json['first_name'] ?? '',
       lastName: json['last_name'] ?? '',
       roles: List<String>.from(json['roles'] ?? []),
+      kycStatus: json['kyc_status'] ?? 'NOT_SUBMITTED',
     );
   }
 

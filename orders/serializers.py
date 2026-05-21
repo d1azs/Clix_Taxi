@@ -73,10 +73,13 @@ class OrderSerializer(serializers.ModelSerializer):
             "is_pet_friendly",
             "needs_child_seat",
             "needs_wheelchair_access",
-            # Статус
+            # Статус та ціна
             "status",
             "status_display",
             "estimated_price",
+            "upfront_price",
+            "commission_deduction",
+            "calculated_distance",
             "route_polyline",
             # Час
             "created_at",

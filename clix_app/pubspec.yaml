@@ -19,6 +19,10 @@ dependencies:
   dio: ^5.7.0
   # JWT & Secure Storage
   flutter_secure_storage: ^9.2.0
+  # Клієнт WebSockets
+  web_socket_channel: ^2.4.0
+  # Фото/KYC
+  image_picker: ^1.1.2
   # Карта (OpenStreetMap)
   flutter_map: ^7.0.2
   latlong2: ^0.9.1

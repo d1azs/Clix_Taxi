@@ -1,0 +1,26 @@
+databases:
+  - name: clix-db
+    plan: free
+    databaseName: clix_db
+    user: clix_user
+
+services:
+  - type: web
+    name: clix-taxi
+    plan: free
+    env: python
+    buildCommand: ./build.sh
+    startCommand: daphne -b 0.0.0.0 -p $PORT clix_backend.asgi:application
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: clix-db
+          property: connectionString
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: PYTHON_VERSION
+        value: "3.11.9"

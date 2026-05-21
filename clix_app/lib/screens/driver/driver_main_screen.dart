@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -5,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/models.dart';
 import 'driver_home_screen.dart';
+import 'kyc_screen.dart'; // NEW
 
 /// Головний екран водія з нижньою навігацією.
 class DriverMainScreen extends StatefulWidget {
@@ -16,21 +18,86 @@ class DriverMainScreen extends StatefulWidget {
 
 class _DriverMainScreenState extends State<DriverMainScreen> {
   int _currentIndex = 0;
+  Timer? _kycPollTimer;
 
-  final _pages = const [
-    DriverHomeScreen(),
-    _DriverHistoryPage(),
-    _DriverEarningsPage(),
-    _DriverProfilePage(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Start polling KYC status if not yet approved
+    _startKycPolling();
+  }
+
+  @override
+  void dispose() {
+    _kycPollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startKycPolling() {
+    _kycPollTimer?.cancel();
+    _kycPollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      final auth = context.read<AuthProvider>();
+      final status = auth.user?.kycStatus ?? 'NOT_SUBMITTED';
+      if (status == 'APPROVED') {
+        _kycPollTimer?.cancel();
+        return;
+      }
+      await auth.refreshKycStatus();
+    });
+  }
+
+  Widget _getRadarPage(String kycStatus) {
+    if (kycStatus == 'APPROVED') {
+      return const DriverHomeScreen();
+    }
+    if (kycStatus == 'PENDING') {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.hourglass_empty, size: 64, color: Colors.orangeAccent),
+            SizedBox(height: 16),
+            Text('Ваші документи на перевірці',
+                style: TextStyle(color: Colors.white, fontSize: 18)),
+            SizedBox(height: 8),
+            Text('Очікуйте підтвердження диспетчера',
+                style: TextStyle(color: Colors.white54)),
+          ],
+        ),
+      );
+    }
+    // NOT_SUBMITTED or REJECTED
+    return KYCScreen(
+      onUploadSuccess: () async {
+        // Refresh user profile from backend to get the real KYC status
+        final auth = context.read<AuthProvider>();
+        await auth.refreshKycStatus();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Документи успішно відправлені!')),
+          );
+        }
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final kycStatus = auth.user?.kycStatus ?? 'NOT_SUBMITTED';
+
+    final pages = [
+      _getRadarPage(kycStatus),
+      const _DriverHistoryPage(),
+      const _DriverEarningsPage(),
+      const _DriverProfilePage(),
+    ];
+
     return Theme(
       data: CLIXTheme.darkTheme,
       child: Scaffold(
         backgroundColor: CLIXTheme.driverBg,
-        body: IndexedStack(index: _currentIndex, children: _pages),
+        body: IndexedStack(index: _currentIndex, children: pages),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
             color: CLIXTheme.driverCard,
@@ -48,7 +115,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _navItem(Icons.map_outlined, Icons.map, 'Карта', 0),
+                   _navItem(Icons.map_outlined, Icons.map, 'Радар / KYC', 0),
                   _navItem(Icons.history_outlined, Icons.history, 'Історія', 1),
                   _navItem(
                     Icons.account_balance_wallet_outlined,
@@ -301,6 +368,7 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
   final _api = ApiService();
   double _totalEarnings = 0;
   int _totalTrips = 0;
+  double _compositeScore = 0.0;
   bool _loading = true;
 
   @override
@@ -318,6 +386,10 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
           _totalEarnings =
               double.tryParse(data['total_earnings']?.toString() ?? '0') ?? 0;
           _totalTrips = data['total_trips'] ?? 0;
+          // Нове поле з бекенду (ranking)
+          if (data['ranking'] != null) {
+            _compositeScore = double.tryParse(data['ranking']['composite_score']?.toString() ?? '0.0') ?? 0.0;
+          }
           _loading = false;
         });
       }
@@ -331,7 +403,7 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
     return Scaffold(
       backgroundColor: CLIXTheme.driverBg,
       appBar: AppBar(
-        title: const Text('Заробіток'),
+        title: const Text('Заробіток та Статистика'),
         centerTitle: true,
         backgroundColor: CLIXTheme.driverCard,
         elevation: 0,
@@ -341,12 +413,12 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             // Головна картка
             Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [CLIXTheme.primary, CLIXTheme.primaryDark],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -407,14 +479,14 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
             Row(
               children: [
                 _statCard(
-                  'Середня',
+                  'Середня варт.',
                   _totalTrips > 0
                       ? '${(_totalEarnings / _totalTrips).toStringAsFixed(0)} ₴'
                       : '0 ₴',
                   Icons.trending_up,
                 ),
                 const SizedBox(width: 12),
-                _statCard('Рейтинг', '5.0', Icons.star),
+                _statCard('Рейтинг', '$_compositeScore / 100', Icons.analytics_outlined),
               ],
             ),
           ],
@@ -456,7 +528,7 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
       ),
     );
   }
-}
+} // End of DriverEarningsPage
 
 /// Профіль водія
 class _DriverProfilePage extends StatelessWidget {
@@ -591,6 +663,172 @@ class _DriverProfilePage extends StatelessWidget {
     );
   }
 
+  void _showMyCarDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: CLIXTheme.driverCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Моє авто', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.directions_car, color: Colors.white),
+              title: const Text('Toyota Corolla', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('BC 1234 AB • Економ', style: TextStyle(color: Colors.white54)),
+              trailing: const Icon(Icons.check_circle, color: CLIXTheme.success),
+              tileColor: Colors.white.withValues(alpha: 0.05),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CLIXTheme.primaryLight,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Закрити'),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPayoutsDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: CLIXTheme.driverCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Способи виплат', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.credit_card, color: Colors.white),
+              title: const Text('Картка ПриватБанк', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('**** **** **** 1234', style: TextStyle(color: Colors.white54)),
+              trailing: const Icon(Icons.check_circle, color: CLIXTheme.success),
+              tileColor: Colors.white.withValues(alpha: 0.05),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.add, color: Colors.white),
+              title: const Text('Додати картку', style: TextStyle(color: Colors.white)),
+              tileColor: Colors.white.withValues(alpha: 0.05),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              onTap: () {},
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CLIXTheme.primaryLight,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Закрити'),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMyRatingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: CLIXTheme.driverCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Мої оцінки', textAlign: TextAlign.center, style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.star, size: 64, color: Colors.amber),
+            const SizedBox(height: 12),
+            const Text(
+              'Рейтинг: 4.92',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            const Text('Ви чудовий водій, так тримати!', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54)),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CLIXTheme.primaryLight,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрити'),
+          )
+        ],
+      ),
+    );
+  }
+
+  void _showSupportDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: CLIXTheme.driverCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Підтримка водіїв', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            ListTile(
+              leading: Icon(Icons.email_outlined, color: CLIXTheme.primaryLight),
+              title: Text('drivers-support@clix.taxi', style: TextStyle(color: Colors.white)),
+              contentPadding: EdgeInsets.zero,
+            ),
+            ListTile(
+              leading: Icon(Icons.phone_outlined, color: CLIXTheme.primaryLight),
+              title: Text('+380 800 123 456', style: TextStyle(color: Colors.white)),
+              contentPadding: EdgeInsets.zero,
+            ),
+            SizedBox(height: 12),
+            Text('Лінія підтримки водіїв працює 24/7. Ми завжди на зв\'язку.',
+              style: TextStyle(fontSize: 13, color: Colors.white54),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрити', style: TextStyle(color: CLIXTheme.primaryLight)),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -690,22 +928,22 @@ class _DriverProfilePage extends StatelessWidget {
               _profileTile(
                 icon: Icons.directions_car_outlined,
                 label: 'Моє авто',
-                onTap: () {},
+                onTap: () => _showMyCarDialog(context),
               ),
               _profileTile(
                 icon: Icons.payment_outlined,
                 label: 'Виплати',
-                onTap: () {},
+                onTap: () => _showPayoutsDialog(context),
               ),
               _profileTile(
                 icon: Icons.star_outline,
                 label: 'Мої оцінки',
-                onTap: () {},
+                onTap: () => _showMyRatingsDialog(context),
               ),
               _profileTile(
                 icon: Icons.help_outline,
                 label: 'Підтримка',
-                onTap: () {},
+                onTap: () => _showSupportDialog(context),
               ),
               if (auth.user?.hasMultipleRoles ?? false)
                 _profileTile(
