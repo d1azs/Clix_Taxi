@@ -36,8 +36,12 @@ jobs:
           cd clix_app
           flutter build apk --release
 
+      - name: Rename APK file with run number
+        run: |
+          mv clix_app/build/app/outputs/flutter-apk/app-release.apk clix_app/build/app/outputs/flutter-apk/clix-taxi-build-${{ github.run_number }}.apk
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: clix-taxi-app-release
-          path: clix_app/build/app/outputs/flutter-apk/app-release.apk
+          name: clix-taxi-app-build-${{ github.run_number }}
+          path: clix_app/build/app/outputs/flutter-apk/clix-taxi-build-${{ github.run_number }}.apk
