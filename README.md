@@ -1,197 +1,181 @@
 <p align="center">
-  <img src="assets/logo.jpg" width="120" alt="CLIX Logo" />
+  <img src="assets/logo.jpg" width="160" alt="CLIX Logo" style="border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);" />
 </p>
 
-<h1 align="center">CLIX — Taxi Service Platform</h1>
-
-<p align="center">
-  <strong>Мобільна платформа для замовлення таксі з ролями пасажира та водія</strong>
-</p>
+<h1 align="center">CLIX Taxi — Інформаційна система замовлення таксі</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-3.10+-02569B?style=flat-square&logo=flutter" />
-  <img src="https://img.shields.io/badge/Django-6.0-092E20?style=flat-square&logo=django" />
-  <img src="https://img.shields.io/badge/DRF-3.16-red?style=flat-square" />
-  <img src="https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite&logoColor=white" />
-  <img src="https://img.shields.io/badge/JWT-Auth-orange?style=flat-square&logo=jsonwebtokens" />
+  <strong>Комплексне програмне рішення для автоматизації пасажирських перевезень</strong><br />
+  <i>Дипломний проєкт з розробки кросплатформного додатку та адмін-панелі диспетчера</i>
 </p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge&logo=render" />
+  <img src="https://img.shields.io/badge/Platform-Render_PaaS-indigo?style=for-the-badge&logo=render" />
+  <img src="https://img.shields.io/badge/CI%2FCD-GitHub_Actions-blue?style=for-the-badge&logo=github-actions" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-3.38-02569B?style=flat-square&logo=flutter&logoColor=white" />
+  <img src="https://img.shields.io/badge/Django_REST-6.0-092E20?style=flat-square&logo=django&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/PostgreSQL-15-4169E1?style=flat-square&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/WebSockets-Daphne-FF6F00?style=flat-square&logo=websocket&logoColor=white" />
+  <img src="https://img.shields.io/badge/JWT-Auth-orange?style=flat-square&logo=jsonwebtokens&logoColor=white" />
+</p>
+
+---
+
+## 🌐 Активні посилання
+
+* 🚀 **Активна URL-адреса робочої версії системи**: [https://clix-taxi.onrender.com](https://clix-taxi.onrender.com)
+* ⚙️ **Адміністративна панель (Django Admin)**: [https://clix-taxi.onrender.com/admin/](https://clix-taxi.onrender.com/admin/)
+* 📱 **Автоматична збірка APK (GitHub Actions)**: Завантажити свіжий файл `clix-taxi-app-release.apk` можна у розділі **Actions** -> **Build Flutter APK** нашого репозиторію.
 
 ---
 
 ## 📖 Опис проєкту
 
-**CLIX** — це повноцінна платформа для виклику таксі. Система складається з:
+**CLIX Taxi** — це інтегрована інформаційна система для замовлення таксі та управління флотом автомобілів. Система орієнтована на забезпечення взаємодії трьох основних груп користувачів: **Пасажирів**, **Водіїв** та **Диспетчерів**. 
 
-- **📱 Flutter-додаток** — єдиний мобільний застосунок з підтримкою ролей пасажира та водія
-- **⚙️ Django REST API** — бекенд з JWT-аутентифікацією, управлінням замовленнями та рейтинговою системою
+Проєкт складається з трьох ключових компонентів:
+1. **📱 Кросплатформний мобільний додаток (Flutter)** — єдиний клієнтський застосунок, що адаптується під роль користувача (пасажир / водій) на основі його облікового запису.
+2. **🖥️ Панель диспетчера (React)** — веб-панель для диспетчерів та адміністраторів, яка відображає карту автомобілів у реальному часі, радар замовлень, систему KYC верифікації документів водіїв та загальну аналітику.
+3. **⚙️ Високопродуктивний бекенд (Django + Django Channels)** — серверна частина на базі протоколів REST API та WebSockets, що обслуговує запити, зберігає дані у PostgreSQL та забезпечує миттєвий обмін координатами й статусами замовлень.
 
-## 🏗️ Архітектура
+---
+
+## 🏗️ Системна архітектура
+
+Проєкт розгорнуто з використанням клієнт-серверної архітектури ASGI для обробки асинхронних з'єднань WebSockets:
 
 ```
-┌──────────────────────────────────────────────┐
-│              Flutter Mobile App              │
-│       ┌──────────┐    ┌──────────┐           │
-│       │ Passenger │    │  Driver  │          │
-│       │  Screen   │    │  Screen  │          │
-│       └────┬─────┘    └────┬─────┘           │
-│            └───────┬───────┘                 │
-│                    ▼                         │
-│            API Service (Dio)                 │
-└─────────────────── │ ────────────────────────┘
-                     │  REST API (JWT)
-┌─────────────────── ▼ ────────────────────────┐
-│           Django REST Framework              │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
-│  │ Accounts │ │  Orders  │ │   Vehicles   │  │
-│  │  Module  │ │  Module  │ │    Module    │  │
-│  └──────────┘ └──────────┘ └──────────────┘  │
-│                    │                         │
-│               SQLite DB                      │
-└──────────────────────────────────────────────┘
+                                 ┌────────────────────────────────────────────────────────┐
+                                 │                 КЛІЄНТСЬКА ЧАСТИНА                     │
+                                 │  📱 Flutter App (Пасажир + Водій)                      │
+                                 │  🖥️ React Dispatcher Panel (Панель диспетчера)         │
+                                 └──────────┬──────────────────────────┬──────────────────┘
+                                            │                          │
+                                            │ HTTP (REST API / JWT)    │ WebSockets (Real-time updates)
+                                            ▼                          ▼
+                                 ┌────────────────────────────────────────────────────────┐
+                                 │                 СЕРВЕРНА ЧАСТИНА (ASGI)                 │
+                                 │                  🚀 Daphne (Render PaaS)               │
+                                 │  ┌───────────────────────┐  ┌───────────────────────┐  │
+                                 │  │   Django REST API     │  │    Django Channels    │  │
+                                 │  │ (Accounts, Orders...) │  │  (Real-time Signals)  │  │
+                                 │  └───────────┬───────────┘  └───────────┬───────────┘  │
+                                 └──────────────┼──────────────────────────┼──────────────┘
+                                                │                          │
+                                                ▼                          ▼
+                                 ┌──────────────────────────┐  ┌──────────────────────────┐
+                                 │       БАЗА ДАНИХ         │  │     КЕШУВАННЯ / БРОКЕР   │
+                                 │  🐘 PostgreSQL (Render)  │  │     InMemory / Redis     │
+                                 └──────────────────────────┘  └──────────────────────────┘
 ```
 
-## ✨ Функціональність
+---
 
-### 🧍 Пасажир
-- Замовлення таксі з вибором адрес (автокомпліт через Nominatim)
-- Вибір класу авто: **Економ**, **Комфорт**, **Бізнес**
-- Відстеження водія на карті в реальному часі
-- Маршрут на карті через OSRM
-- Оцінка водія після поїздки (1–5 ⭐)
-- Історія поїздок
+## ✨ Ключовий функціонал
 
-### 🚗 Водій
-- Радар замовлень з пульсуючою анімацією
-- Прийняття/відхилення замовлень
-- Прогрес-бар етапів поїздки (Прибуття → Забираю → В дорозі → Готово)
-- Маршрут до пасажира та до точки призначення
-- Статистика заробітку та кількості поїздок
-- Рейтингова система
+### 🧍 Функціонал Пасажира (Мобільний додаток)
+* Автоматичне визначення геопозиції та пошук адрес (Nominatim OpenStreetMap).
+* Вибір класу обслуговування (**Економ**, **Комфорт**, **Бізнес**).
+* Побудова маршруту та розрахунок вартості поїздки (OSRM API).
+* Відстеження руху призначеного автомобіля на карті в реальному часі.
+* Можливість оцінити поїздку (1-5 зірок ⭐) та залишити текстовий відгук.
+
+### 🚗 Функціонал Водія (Мобільний додаток)
+* Режим радару для прийому замовлень із візуальними та звуковими сповіщеннями.
+* Покроковий контроль етапів поїздки: *Прибуття на місце -> Посадка пасажира -> Поїздка -> Завершення*.
+* Завантаження документів водія (паспорт, права, техпаспорт) для проходження KYC-верифікації.
+* Перегляд особистого балансу, історії заробітку та поточного рейтингу.
+
+### 🖥️ Функціонал Диспетчера (React Web-панель)
+* Інтерактивна моніторингова карта автомобілів на лінії.
+* Примусове призначення водіїв на замовлення (Force-Assign).
+* Модуль верифікації документів KYC водіїв (схвалення / відхилення профілів).
+* Статистичний дашборд: кількість активних замовлень, загальна виручка системи, графік скасувань та відкриті скарги.
+
+---
 
 ## 🛠️ Технологічний стек
 
-| Компонент | Технологія |
-|-----------|-----------|
-| **Mobile App** | Flutter 3.10+, Dart |
-| **State Management** | Provider |
-| **HTTP Client** | Dio |
-| **Maps** | flutter_map + OpenStreetMap |
-| **Routing** | OSRM (Open Source Routing Machine) |
-| **Geocoding** | Nominatim API |
-| **Backend** | Django 6.0, Django REST Framework 3.16 |
-| **Auth** | JWT (SimpleJWT) |
-| **Database** | SQLite 3 |
-| **Code Quality** | Black, isort, Flake8 |
-| **CI/CD** | GitHub Actions |
+| Складова | Технології | Призначення |
+|----------|------------|-------------|
+| **Мобільна розробка** | Flutter 3.38 / Dart | Кросплатформний додаток (iOS / Android) |
+| **Управління станом** | Provider, Riverpod | Клієнтська бізнес-логіка |
+| **Веб-панель** | React 18 / Vite / Vanilla CSS | Диспетчерська консоль керування |
+| **Бекенд-платформа** | Django 6.0 / Django REST Framework | REST API сервіси, автентифікація JWT |
+| **Режим реального часу** | Django Channels 4.2 / Daphne | Асинхронний сервер WebSockets |
+| **База даних** | PostgreSQL 15 | Головне реляційне сховище даних |
+| **Гео-сервіси** | OpenStreetMap / Nominatim / OSRM | Карти, геокодування адрес, прокладання маршрутів |
+| **CI/CD** | GitHub Actions | Автоматична збірка `.apk` файлів при оновленні коду |
+| **Хостинг** | Render PaaS | Хмарне розміщення веб-сервісу та бази даних |
 
-## 🚀 Запуск проєкту
+---
 
-### Передумови
-- Python 3.12+
-- Flutter 3.10+
+## 🚀 Початок роботи та локальний запуск
 
-### Backend
+### Системні вимоги
+* **Python** >= 3.12
+* **Flutter** >= 3.38
+* **Node.js** >= 18 (для запуску панелі диспетчера)
 
+### 1. Серверна частина (Django)
 ```bash
-# Клонування репозиторію
-git clone https://github.com/d1azs/Clix_Taxi.git
+# Перехід у папку проекту
 cd Clix_Taxi
 
-# Створення віртуального оточення
+# Створення та активація віртуального середовища
 python -m venv venv
-source venv/bin/activate  # macOS/Linux
+source venv/bin/activate  # Для macOS/Linux
+# venv\Scripts\activate  # Для Windows
 
 # Встановлення залежностей
 pip install -r requirements.txt
 
-# Міграції
+# Виконання міграцій бази даних
 python manage.py migrate
 
-# Завантаження тестових даних
+# Заповнення бази даних тестовими даними (водії, пасажири, автомобілі)
 python seed_data.py
 
-# Запуск сервера
+# Запуск ASGI сервера Daphne локально
 python manage.py runserver 0.0.0.0:8000
 ```
 
-### Flutter App
+### 2. Панель Диспетчера (React Web)
+```bash
+cd dispatcher-panel
 
+# Встановлення пакетів npm
+npm install
+
+# Запуск у режимі розробки
+npm run dev
+```
+*Панель буде доступна за адресою [http://localhost:5174](http://localhost:5174).*
+
+### 3. Мобільний додаток (Flutter)
 ```bash
 cd clix_app
 
-# Встановлення залежностей
+# Отримання Dart-пакетів
 flutter pub get
 
-# Запуск
+# Запуск додатку на емуляторі або підключеному пристрої
 flutter run
 ```
 
-### Тестові акаунти
+---
 
-| Роль | Телефон | Пароль |
+## 👤 Тестові облікові записи для перевірки
+
+Для тестування роботи системи введіть такі облікові дані при вході:
+
+| Роль | Номер телефону | Пароль |
 |------|---------|--------|
-| 🧍 Пасажир | `+380971234567` | `password123` |
-| 🚗 Водій | `+380661234567` | `password123` |
-
-## 📁 Структура проєкту
-
-```
-Clix_Taxi/
-├── accounts/           # Модуль аутентифікації та профілів
-│   ├── models.py       # User, DriverProfile, Role
-│   ├── views.py        # Login, Register, Profile API
-│   └── serializers.py
-├── orders/             # Модуль замовлень
-│   ├── models.py       # Order, Review
-│   ├── views.py        # CRUD, статуси, рейтинги
-│   └── serializers.py
-├── vehicles/           # Модуль транспортних засобів
-│   ├── models.py       # Vehicle, VehicleClass
-│   └── views.py
-├── clix_backend/       # Налаштування Django
-│   ├── settings.py
-│   └── urls.py
-├── clix_app/           # Flutter мобільний додаток
-│   └── lib/
-│       ├── config/     # Теми, API конфігурація
-│       ├── models/     # Моделі даних
-│       ├── providers/  # Auth Provider
-│       ├── screens/    # UI екрани
-│       │   ├── auth/       # Логін, вибір ролі
-│       │   ├── passenger/  # Екран пасажира
-│       │   └── driver/     # Екран водія
-│       └── services/   # API, Routing, Geocoding
-├── seed_data.py        # Скрипт для тестових даних
-├── requirements.txt    # Python залежності
-└── pyproject.toml      # Конфігурація Black/isort
-```
-
-## 🔌 API Endpoints
-
-### Аутентифікація
-| Метод | Endpoint | Опис |
-|-------|----------|------|
-| `POST` | `/api/auth/login/` | Вхід (JWT) |
-| `POST` | `/api/auth/register/` | Реєстрація |
-| `POST` | `/api/auth/token/refresh/` | Оновлення токена |
-| `GET` | `/api/auth/me/` | Профіль користувача |
-
-### Пасажир
-| Метод | Endpoint | Опис |
-|-------|----------|------|
-| `POST` | `/api/passenger/orders/` | Створити замовлення |
-| `GET` | `/api/passenger/orders/active/` | Активне замовлення |
-| `POST` | `/api/passenger/orders/<id>/cancel/` | Скасувати |
-
-### Водій
-| Метод | Endpoint | Опис |
-|-------|----------|------|
-| `GET` | `/api/orders/available/` | Доступні замовлення |
-| `POST` | `/api/orders/<id>/accept/` | Прийняти |
-| `PATCH` | `/api/orders/<id>/status/` | Змінити статус |
-
-### Спільні
-| Метод | Endpoint | Опис |
-|-------|----------|------|
-| `GET` | `/api/orders/history/` | Історія поїздок |
-| `POST` | `/api/orders/<id>/review/` | Залишити відгук |
+| **🧍 Пасажир** | `+380971234567` | `password123` |
+| **🚗 Водій** | `+380661234567` | `password123` |
+| **🖥️ Диспетчер** | `+380501234567` | `password123` |
