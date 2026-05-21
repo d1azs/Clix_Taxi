@@ -52,10 +52,4 @@ urlpatterns = [
         views.DispatcherUserSearchView.as_view(),
         name="dispatcher-user-search",
     ),
-    # Тимчасовий роут для скидання КУС водія
-    path(
-        "temp/reset-kyc/",
-        views.TempResetKYCView.as_view(),
-        name="temp-reset-kyc",
-    ),
 ]
