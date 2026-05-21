@@ -50,3 +50,4 @@ flutter:
   assets:
     - .env
     - assets/icons/
+    - assets/kyc_samples/

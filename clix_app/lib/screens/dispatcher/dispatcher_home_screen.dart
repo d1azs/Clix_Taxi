@@ -667,6 +667,16 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
       }
     }
 
+    // Pick local asset fallback based on document title
+    String _fallbackAsset() {
+      if (title.contains('Права') || title.contains('license') || title.contains('Посвідчення')) {
+        return 'assets/kyc_samples/license.jpg';
+      } else if (title.contains('Техпаспорт') || title.contains('registration') || title.contains('ТЕХ') || title.contains('Реєстрація')) {
+        return 'assets/kyc_samples/registration.jpg';
+      }
+      return 'assets/kyc_samples/id_card.jpg';
+    }
+
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -691,24 +701,10 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
                     icon: const Icon(Icons.open_in_new, color: CLIXTheme.primary, size: 20),
                     tooltip: 'Відкрити у великому вікні',
                     onPressed: () {
-                      String openUrl = imageUrl;
-                      String fallbackUrl = 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?q=80&w=600&auto=format&fit=crop';
-                      if (title.contains('Права') || title.contains('license')) {
-                        fallbackUrl = 'https://images.unsplash.com/photo-1554774853-719586f82d77?q=80&w=600&auto=format&fit=crop';
-                      } else if (title.contains('Техпаспорт') || title.contains('registration')) {
-                        fallbackUrl = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=600&auto=format&fit=crop';
-                      } else if (title.contains('Паспорт') || title.contains('passport') || title.contains('id_card')) {
-                        fallbackUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60';
-                      }
-                      
-                      if (!path.startsWith('http') && !path.contains('/')) {
-                        openUrl = fallbackUrl;
-                      }
-                      
                       if (Platform.isMacOS) {
-                        Process.run('open', [openUrl]);
+                        Process.run('open', [imageUrl]);
                       } else if (Platform.isWindows) {
-                        Process.run('start', [openUrl], runInShell: true);
+                        Process.run('start', [imageUrl], runInShell: true);
                       }
                     },
                   ),
@@ -730,24 +726,10 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
                     bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
                 child: GestureDetector(
                   onTap: () {
-                    String openUrl = imageUrl;
-                    String fallbackUrl = 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?q=80&w=600&auto=format&fit=crop';
-                    if (title.contains('Права') || title.contains('license')) {
-                      fallbackUrl = 'https://images.unsplash.com/photo-1554774853-719586f82d77?q=80&w=600&auto=format&fit=crop';
-                    } else if (title.contains('Техпаспорт') || title.contains('registration')) {
-                      fallbackUrl = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=600&auto=format&fit=crop';
-                    } else if (title.contains('Паспорт') || title.contains('passport') || title.contains('id_card')) {
-                      fallbackUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60';
-                    }
-                    
-                    if (!path.startsWith('http') && !path.contains('/')) {
-                      openUrl = fallbackUrl;
-                    }
-                    
                     if (Platform.isMacOS) {
-                      Process.run('open', [openUrl]);
+                      Process.run('open', [imageUrl]);
                     } else if (Platform.isWindows) {
-                      Process.run('start', [openUrl], runInShell: true);
+                      Process.run('start', [imageUrl], runInShell: true);
                     }
                   },
                   child: Tooltip(
@@ -770,51 +752,17 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
                         );
                       },
                       errorBuilder: (_, __, ___) {
-                        String fallbackUrl = 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?q=80&w=600&auto=format&fit=crop';
-                        if (title.contains('Права') || title.contains('license')) {
-                          fallbackUrl = 'https://images.unsplash.com/photo-1554774853-719586f82d77?q=80&w=600&auto=format&fit=crop';
-                        } else if (title.contains('Техпаспорт') || title.contains('registration')) {
-                          fallbackUrl = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=600&auto=format&fit=crop';
-                        } else if (title.contains('Паспорт') || title.contains('passport') || title.contains('id_card')) {
-                          fallbackUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60';
-                        }
                         return Stack(
                           alignment: Alignment.center,
                           children: [
-                            Image.network(
-                              fallbackUrl,
+                            Image.asset(
+                              _fallbackAsset(),
                               fit: BoxFit.contain,
-                              loadingBuilder: (_, child, progress) {
-                                if (progress == null) return child;
-                                return const SizedBox(
-                                  height: 250,
-                                  child: Center(child: CircularProgressIndicator(color: CLIXTheme.primary)),
-                                );
-                              },
                               errorBuilder: (_, __, ___) => Container(
                                 height: 250,
                                 color: const Color(0xFF1C1F2E),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.insert_drive_file, size: 64, color: CLIXTheme.primary),
-                                    const SizedBox(height: 16),
-                                    Text(title,
-                                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-                                    const SizedBox(height: 8),
-                                    Text(path,
-                                        style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: CLIXTheme.success.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Text('✅ Документ завантажений',
-                                          style: TextStyle(color: CLIXTheme.success, fontWeight: FontWeight.w600)),
-                                    ),
-                                  ],
+                                child: const Center(
+                                  child: Icon(Icons.broken_image, size: 64, color: Colors.white38),
                                 ),
                               ),
                             ),

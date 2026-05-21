@@ -1517,70 +1517,39 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Заглушка Apple Pay та замовлення
-              Row(
-                children: [
-                  Expanded(
-                    flex: 1,
-                    child: SizedBox(
-                      height: 54,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: CLIXTheme.divider),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(CLIXTheme.radiusMd)),
-                        ),
-                        onPressed: () {
-                           // Mock cash selection
-                           ScaffoldMessenger.of(context).showSnackBar(
-                             const SnackBar(content: Text('Обрано оплату готівкою'))
-                           );
-                        },
-                        child: const Icon(Icons.money, color: CLIXTheme.success),
-                      ),
+              // Кнопка замовлення таксі
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _createOrder,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: CLIXTheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(CLIXTheme.radiusMd),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 3,
-                    child: SizedBox(
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _createOrder,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black, // Apple Pay Color
-                          foregroundColor: Colors.white,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : Text(
+                          _scheduledTime != null
+                              ? 'Запланувати поїздку'
+                              : 'Викликати таксі!',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.apple, size: 22),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _scheduledTime != null
-                                        ? 'Запланувати Pay'
-                                        : 'Pay',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 24),
             ],
