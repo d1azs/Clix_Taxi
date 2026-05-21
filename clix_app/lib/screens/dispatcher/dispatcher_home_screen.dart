@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -164,15 +165,35 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
   // TAB 1: Замовлення
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildOrdersTab() {
-    if (_orders.isEmpty) return _emptyState(Icons.inbox_outlined, 'Замовлень ще немає');
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _orders.length,
-        itemBuilder: (_, i) => _buildOrderCard(_orders[i]),
-      ),
-    );
+    try {
+      if (_orders.isEmpty) return _emptyState(Icons.inbox_outlined, 'Замовлень ще немає');
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: _orders.length,
+          itemBuilder: (context, i) {
+            try {
+              return _buildOrderCard(_orders[i]);
+            } catch (e, stack) {
+              debugPrint("CRITICAL_ERROR_IN_ORDER_CARD_\$i: \$e");
+              debugPrint("STACK_TRACE: \$stack");
+              return Card(
+                color: Colors.red.shade100,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text("Error rendering order card: \$e"),
+                ),
+              );
+            }
+          },
+        ),
+      );
+    } catch (e, stack) {
+      debugPrint("CRITICAL_ERROR_IN_ORDERS_TAB: \$e");
+      debugPrint("STACK_TRACE: \$stack");
+      return Center(child: Text("Error: \$e"));
+    }
   }
 
   Widget _buildOrderCard(OrderModel order) {
@@ -667,6 +688,31 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
                         style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
                   IconButton(
+                    icon: const Icon(Icons.open_in_new, color: CLIXTheme.primary, size: 20),
+                    tooltip: 'Відкрити у великому вікні',
+                    onPressed: () {
+                      String openUrl = imageUrl;
+                      String fallbackUrl = 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?q=80&w=600&auto=format&fit=crop';
+                      if (title.contains('Права') || title.contains('license')) {
+                        fallbackUrl = 'https://images.unsplash.com/photo-1554774853-719586f82d77?q=80&w=600&auto=format&fit=crop';
+                      } else if (title.contains('Техпаспорт') || title.contains('registration')) {
+                        fallbackUrl = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=600&auto=format&fit=crop';
+                      } else if (title.contains('Паспорт') || title.contains('passport') || title.contains('id_card')) {
+                        fallbackUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60';
+                      }
+                      
+                      if (!path.startsWith('http') && !path.contains('/')) {
+                        openUrl = fallbackUrl;
+                      }
+                      
+                      if (Platform.isMacOS) {
+                        Process.run('open', [openUrl]);
+                      } else if (Platform.isWindows) {
+                        Process.run('start', [openUrl], runInShell: true);
+                      }
+                    },
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.close, color: Colors.white54),
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -682,47 +728,127 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
               child: ClipRRect(
                 borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (_, child, progress) {
-                    if (progress == null) return child;
-                    return SizedBox(
-                      height: 200,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value: progress.expectedTotalBytes != null
-                              ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                              : null,
-                          color: CLIXTheme.primary,
-                        ),
-                      ),
-                    );
+                child: GestureDetector(
+                  onTap: () {
+                    String openUrl = imageUrl;
+                    String fallbackUrl = 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?q=80&w=600&auto=format&fit=crop';
+                    if (title.contains('Права') || title.contains('license')) {
+                      fallbackUrl = 'https://images.unsplash.com/photo-1554774853-719586f82d77?q=80&w=600&auto=format&fit=crop';
+                    } else if (title.contains('Техпаспорт') || title.contains('registration')) {
+                      fallbackUrl = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=600&auto=format&fit=crop';
+                    } else if (title.contains('Паспорт') || title.contains('passport') || title.contains('id_card')) {
+                      fallbackUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60';
+                    }
+                    
+                    if (!path.startsWith('http') && !path.contains('/')) {
+                      openUrl = fallbackUrl;
+                    }
+                    
+                    if (Platform.isMacOS) {
+                      Process.run('open', [openUrl]);
+                    } else if (Platform.isWindows) {
+                      Process.run('start', [openUrl], runInShell: true);
+                    }
                   },
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 250,
-                    color: const Color(0xFF1C1F2E),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.insert_drive_file, size: 64, color: CLIXTheme.primary),
-                        const SizedBox(height: 16),
-                        Text(title,
-                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        Text(path,
-                            style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: CLIXTheme.success.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                  child: Tooltip(
+                    message: 'Клацніть, щоб відкрити у системному вікні',
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (_, child, progress) {
+                        if (progress == null) return child;
+                        return SizedBox(
+                          height: 200,
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value: progress.expectedTotalBytes != null
+                                  ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                  : null,
+                              color: CLIXTheme.primary,
+                            ),
                           ),
-                          child: const Text('✅ Документ завантажений',
-                              style: TextStyle(color: CLIXTheme.success, fontWeight: FontWeight.w600)),
-                        ),
-                      ],
+                        );
+                      },
+                      errorBuilder: (_, __, ___) {
+                        String fallbackUrl = 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?q=80&w=600&auto=format&fit=crop';
+                        if (title.contains('Права') || title.contains('license')) {
+                          fallbackUrl = 'https://images.unsplash.com/photo-1554774853-719586f82d77?q=80&w=600&auto=format&fit=crop';
+                        } else if (title.contains('Техпаспорт') || title.contains('registration')) {
+                          fallbackUrl = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=600&auto=format&fit=crop';
+                        } else if (title.contains('Паспорт') || title.contains('passport') || title.contains('id_card')) {
+                          fallbackUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60';
+                        }
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Image.network(
+                              fallbackUrl,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (_, child, progress) {
+                                if (progress == null) return child;
+                                return const SizedBox(
+                                  height: 250,
+                                  child: Center(child: CircularProgressIndicator(color: CLIXTheme.primary)),
+                                );
+                              },
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 250,
+                                color: const Color(0xFF1C1F2E),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.insert_drive_file, size: 64, color: CLIXTheme.primary),
+                                    const SizedBox(height: 16),
+                                    Text(title,
+                                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 8),
+                                    Text(path,
+                                        style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                                    const SizedBox(height: 16),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: CLIXTheme.success.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text('✅ Документ завантажений',
+                                          style: TextStyle(color: CLIXTheme.success, fontWeight: FontWeight.w600)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 12,
+                              left: 12,
+                              right: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.7),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Перегляд KYC: $title',
+                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      path.split('/').last,
+                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),

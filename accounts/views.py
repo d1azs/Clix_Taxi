@@ -354,3 +354,24 @@ class DispatcherUserSearchView(APIView):
         )[:10]
 
         return Response(list(users))
+
+
+class TempResetKYCView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        from .models import KYCDocument, User, KYCStatus
+        try:
+            user = User.objects.get(phone_number='+380661234567')
+            profile = user.driver_profile
+            # Delete any existing KYC documents to reset to NOT_SUBMITTED
+            deleted_count, _ = KYCDocument.objects.filter(driver=profile).delete()
+            profile.status = 'OFFLINE'
+            profile.save()
+            return Response({
+                "status": "success",
+                "message": f"Deleted {deleted_count} KYC documents. Status reset to NOT_SUBMITTED.",
+                "phone": user.phone_number
+            })
+        except Exception as e:
+            return Response({"status": "error", "message": str(e)})

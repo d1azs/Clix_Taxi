@@ -23,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    // Clean startup to allow manual logins to different roles/accounts
   }
 
   @override
