@@ -313,4 +313,3 @@ class CancellationLog(models.Model):
 
     def __str__(self):
         return f"Скасування {self.order_id.__str__()[:8]} — {self.get_reason_display()}"
-

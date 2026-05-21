@@ -30,14 +30,12 @@ urlpatterns = [
         views.DismissRatingView.as_view(),
         name="passenger-order-dismiss-rating",
     ),
-
     # ── Nearby Drivers (для маркерів на карті) ──
     path(
         "drivers/nearby/",
         views.NearbyDriversView.as_view(),
         name="drivers-nearby",
     ),
-
     # ── Водій ──
     path(
         "driver/orders/active/",

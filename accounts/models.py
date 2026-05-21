@@ -49,6 +49,7 @@ class UserManager(BaseUserManager):
 # ---------------------------------------------------------------------------
 class User(AbstractBaseUser, PermissionsMixin):
     """Кастомний користувач CLIX — аутентифікація за номером телефону."""
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     phone_number = models.CharField(
         max_length=20,
@@ -202,9 +203,7 @@ class KYCDocument(models.Model):
         help_text="Причина відхилення або додаткова інформація",
     )
     submitted_at = models.DateTimeField(auto_now_add=True, verbose_name="Подано")
-    reviewed_at = models.DateTimeField(
-        null=True, blank=True, verbose_name="Перевірено"
-    )
+    reviewed_at = models.DateTimeField(null=True, blank=True, verbose_name="Перевірено")
 
     class Meta:
         verbose_name = "KYC документ"
@@ -257,4 +256,3 @@ class DriverRanking(models.Model):
 
     def __str__(self):
         return f"Ранкінг: {self.driver.user.phone_number} — {self.composite_score}"
-

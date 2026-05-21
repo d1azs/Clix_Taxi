@@ -25,7 +25,9 @@ def broadcast_new_order(order):
             "dropoff_lat": order.dropoff_lat,
             "dropoff_lng": order.dropoff_lng,
             "required_class": order.required_class,
-            "estimated_price": str(order.estimated_price) if order.estimated_price else None,
+            "estimated_price": (
+                str(order.estimated_price) if order.estimated_price else None
+            ),
             "upfront_price": str(order.upfront_price) if order.upfront_price else None,
             "status": order.status,
         },
@@ -46,9 +48,7 @@ def broadcast_order_status(order):
     }
 
     # Сповістити tracking group (пасажир)
-    async_to_sync(channel_layer.group_send)(
-        f"tracking_{order.id}", payload
-    )
+    async_to_sync(channel_layer.group_send)(f"tracking_{order.id}", payload)
 
     # Сповістити orders_feed (водії + диспетчер)
     async_to_sync(channel_layer.group_send)("orders_feed", payload)

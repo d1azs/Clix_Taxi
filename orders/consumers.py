@@ -72,9 +72,7 @@ class TelemetryConsumer(AsyncJsonWebsocketConsumer):
 
         # Ретрансляція на tracking group (пасажир бачить свого водія)
         if active_order_id:
-            await self.channel_layer.group_send(
-                f"tracking_{active_order_id}", payload
-            )
+            await self.channel_layer.group_send(f"tracking_{active_order_id}", payload)
 
     async def driver_location(self, event):
         """Відправити оновлення координат клієнтам у group."""

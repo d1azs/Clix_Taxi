@@ -24,7 +24,10 @@ def haversine_km(lat1, lng1, lat2, lng2):
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlam = math.radians(lng2 - lng1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    a = (
+        math.sin(dphi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    )
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
@@ -33,7 +36,9 @@ def estimate_duration_min(distance_km):
     return distance_km / 30 * 60
 
 
-def compute_fixed_price(pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, vehicle_class="ECONOMY"):
+def compute_fixed_price(
+    pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, vehicle_class="ECONOMY"
+):
     """
     Повна розбивка ціни:
     {

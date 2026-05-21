@@ -11,27 +11,86 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('accounts', '0001_initial'),
+        ("accounts", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Vehicle',
+            name="Vehicle",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('make_model', models.CharField(help_text='Наприклад: Škoda Octavia', max_length=100, verbose_name='Марка та модель')),
-                ('license_plate', models.CharField(max_length=15, unique=True, verbose_name='Номерний знак')),
-                ('vehicle_class', models.CharField(choices=[('ECONOMY', 'Економ'), ('PREMIUM', 'Комфорт'), ('MINIVAN', 'Мінівен')], default='ECONOMY', max_length=10, verbose_name='Клас авто')),
-                ('color', models.CharField(blank=True, max_length=50, verbose_name='Колір')),
-                ('is_pet_friendly', models.BooleanField(default=False, verbose_name='Дозволені тварини')),
-                ('has_child_seat', models.BooleanField(default=False, verbose_name='Дитяче крісло')),
-                ('is_wheelchair_accessible', models.BooleanField(default=False, verbose_name='Доступність для інвалідних візків')),
-                ('is_active', models.BooleanField(default=True, verbose_name='Активний')),
-                ('driver_profile', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='vehicles', to='accounts.driverprofile', verbose_name='Водій')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "make_model",
+                    models.CharField(
+                        help_text="Наприклад: Škoda Octavia",
+                        max_length=100,
+                        verbose_name="Марка та модель",
+                    ),
+                ),
+                (
+                    "license_plate",
+                    models.CharField(
+                        max_length=15, unique=True, verbose_name="Номерний знак"
+                    ),
+                ),
+                (
+                    "vehicle_class",
+                    models.CharField(
+                        choices=[
+                            ("ECONOMY", "Економ"),
+                            ("PREMIUM", "Комфорт"),
+                            ("MINIVAN", "Мінівен"),
+                        ],
+                        default="ECONOMY",
+                        max_length=10,
+                        verbose_name="Клас авто",
+                    ),
+                ),
+                (
+                    "color",
+                    models.CharField(blank=True, max_length=50, verbose_name="Колір"),
+                ),
+                (
+                    "is_pet_friendly",
+                    models.BooleanField(
+                        default=False, verbose_name="Дозволені тварини"
+                    ),
+                ),
+                (
+                    "has_child_seat",
+                    models.BooleanField(default=False, verbose_name="Дитяче крісло"),
+                ),
+                (
+                    "is_wheelchair_accessible",
+                    models.BooleanField(
+                        default=False, verbose_name="Доступність для інвалідних візків"
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(default=True, verbose_name="Активний"),
+                ),
+                (
+                    "driver_profile",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="vehicles",
+                        to="accounts.driverprofile",
+                        verbose_name="Водій",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Автомобіль',
-                'verbose_name_plural': 'Автомобілі',
+                "verbose_name": "Автомобіль",
+                "verbose_name_plural": "Автомобілі",
             },
         ),
     ]

@@ -12,7 +12,6 @@ from django.utils import timezone
 from .models import Order, OrderStatus
 from .signals import broadcast_order_status
 
-
 # Таймаут для пошуку водія — 5 хвилин
 DRIVER_SEARCH_TIMEOUT = timedelta(minutes=5)
 

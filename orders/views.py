@@ -177,6 +177,7 @@ class PassengerCancelOrderView(APIView):
 
         # Audit log
         from .models import CancellationLog, CancellationReason
+
         CancellationLog.objects.create(
             order=order,
             cancelled_by=request.user,
@@ -375,6 +376,7 @@ class UpdateOrderStatusView(APIView):
             driver_profile.save()
             # Перерахунок ранкінгу
             from .ranking_service import recalculate_driver_ranking
+
             recalculate_driver_ranking(driver_profile)
 
         order.save()
@@ -587,9 +589,11 @@ class DispatcherQueueView(APIView):
         from .models import VirtualQueue, VirtualQueueEntry
 
         if pk:
-            entries = VirtualQueueEntry.objects.filter(
-                queue_id=pk
-            ).select_related("driver", "driver__user").order_by("position")
+            entries = (
+                VirtualQueueEntry.objects.filter(queue_id=pk)
+                .select_related("driver", "driver__user")
+                .order_by("position")
+            )
             data = [
                 {
                     "position": e.position,
@@ -703,15 +707,15 @@ class PriceQuoteView(APIView):
 
         if None in (lat1, lng1, lat2, lng2):
             return Response(
-                {"error": "Необхідні поля: pickup_lat, pickup_lng, dropoff_lat, dropoff_lng"},
+                {
+                    "error": "Необхідні поля: pickup_lat, pickup_lng, dropoff_lat, dropoff_lng"
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         from .pricing import compute_all_classes
 
-        quotes = compute_all_classes(
-            float(lat1), float(lng1), float(lat2), float(lng2)
-        )
+        quotes = compute_all_classes(float(lat1), float(lng1), float(lat2), float(lng2))
         return Response(quotes)
 
 
@@ -744,5 +748,3 @@ class NearbyDriversView(APIView):
             for d in drivers
         ]
         return Response(data)
-
-

@@ -1,10 +1,10 @@
-import re
 import os
+import re
 
 files = [
     "landing-react/src/data/translations.js",
     "landing-react/src/components/passenger/PassengerHero.jsx",
-    "landing-react/src/components/driver/DriverHero.jsx"
+    "landing-react/src/components/driver/DriverHero.jsx",
 ]
 
 replacements = [
@@ -19,7 +19,6 @@ replacements = [
     (r"з аеропорту Праги", "з аеропорту Львова"),
     (r"Praha 1, Hotel Astoria", "Львів, Готель Асторія"),
     (r"у Прагу", "до Львова"),
-    
     # CS
     (r"Dostupné v Praze", "Dostupné ve Lvově"),
     (r"letiště Václava Havla", "letiště Lvov"),
@@ -27,7 +26,6 @@ replacements = [
     (r"3 roky v Praze", "3 roky ve Lvově"),
     (r"z letiště Praha", "z letiště Lvov"),
     (r"do Prahy", "do Lvova"),
-    
     # EN
     (r"Available in Prague", "Available in Lviv"),
     (r"Václav Havel Airport", "Lviv International Airport"),
@@ -37,7 +35,6 @@ replacements = [
     (r"Airport → Prague 1, 2 pax, 890 CZK", "Airport → Center, 2 pax, 890 UAH"),
     (r"3 years in Prague", "3 years in Lviv"),
     (r"flight to Prague", "flight to Lviv"),
-    
     # Currency
     (r"890 Kč", "890 ₴"),
 ]
@@ -47,10 +44,10 @@ for file_path in files:
     if os.path.exists(full_path):
         with open(full_path, "r", encoding="utf-8") as f:
             content = f.read()
-            
+
         for old, new in replacements:
             content = re.sub(old, new, content)
-            
+
         with open(full_path, "w", encoding="utf-8") as f:
             f.write(content)
         print(f"Updated {file_path}")

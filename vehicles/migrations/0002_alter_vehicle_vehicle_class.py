@@ -6,13 +6,23 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('vehicles', '0001_initial'),
+        ("vehicles", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='vehicle',
-            name='vehicle_class',
-            field=models.CharField(choices=[('ECONOMY', 'Економ'), ('PREMIUM', 'Комфорт'), ('BUSINESS', 'Бізнес'), ('MINIVAN', 'Мінівен')], default='ECONOMY', max_length=10, verbose_name='Клас авто'),
+            model_name="vehicle",
+            name="vehicle_class",
+            field=models.CharField(
+                choices=[
+                    ("ECONOMY", "Економ"),
+                    ("PREMIUM", "Комфорт"),
+                    ("BUSINESS", "Бізнес"),
+                    ("MINIVAN", "Мінівен"),
+                ],
+                default="ECONOMY",
+                max_length=10,
+                verbose_name="Клас авто",
+            ),
         ),
     ]

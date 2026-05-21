@@ -8,17 +8,17 @@ with open(file_path, "r", encoding="utf-8") as f:
 # 1. Imports
 content = content.replace(
     "import '../../models/models.dart';",
-    "import '../../models/models.dart';\nimport 'package:flutter/services.dart';\nimport 'package:flutter_map/flutter_map.dart';\nimport 'package:latlong2/latlong.dart' as latlong;"
+    "import '../../models/models.dart';\nimport 'package:flutter/services.dart';\nimport 'package:flutter_map/flutter_map.dart';\nimport 'package:latlong2/latlong.dart' as latlong;",
 )
 
 # 2. TabController length & Fullscreen
 content = content.replace(
     "_tabController = TabController(length: 4, vsync: this);",
-    "_tabController = TabController(length: 5, vsync: this);\n    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);"
+    "_tabController = TabController(length: 5, vsync: this);\n    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);",
 )
 content = content.replace(
     "super.dispose();\n  }",
-    "SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);\n    super.dispose();\n  }"
+    "SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);\n    super.dispose();\n  }",
 )
 
 # 3. Tabs
@@ -95,7 +95,11 @@ map_impl = """
     );
   }
 """
-content = content.replace("  // ═══════════════════════════════════════════════════════════════════════\n  // TAB 3: KYC", map_impl + "\n  // ═══════════════════════════════════════════════════════════════════════\n  // TAB 3: KYC")
+content = content.replace(
+    "  // ═══════════════════════════════════════════════════════════════════════\n  // TAB 3: KYC",
+    map_impl
+    + "\n  // ═══════════════════════════════════════════════════════════════════════\n  // TAB 3: KYC",
+)
 
 # 6. CreateOrderSheet state
 sheet_vars_old = """  String _selectedClass = 'ECONOMY';
@@ -165,4 +169,3 @@ content = content.replace(ui_old, ui_new)
 
 with open(file_path, "w", encoding="utf-8") as f:
     f.write(content)
-

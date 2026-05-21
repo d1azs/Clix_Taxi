@@ -135,7 +135,6 @@ class UpdateProfileSerializer(serializers.ModelSerializer):
         fields = ["first_name", "last_name"]
 
 
-
 # ---------------------------------------------------------------------------
 # Профіль водія
 # ---------------------------------------------------------------------------
@@ -171,25 +170,58 @@ class KYCUploadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = KYCDocument
-        fields = ["id", "id_card", "license", "registration", "status", "feedback_note", "submitted_at", "reviewed_at"]
-        read_only_fields = ["id", "status", "feedback_note", "submitted_at", "reviewed_at"]
+        fields = [
+            "id",
+            "id_card",
+            "license",
+            "registration",
+            "status",
+            "feedback_note",
+            "submitted_at",
+            "reviewed_at",
+        ]
+        read_only_fields = [
+            "id",
+            "status",
+            "feedback_note",
+            "submitted_at",
+            "reviewed_at",
+        ]
 
 
 class KYCReviewSerializer(serializers.ModelSerializer):
     """Серіалайзер для перевірки KYC диспетчером."""
 
-    driver_phone = serializers.CharField(source="driver.user.phone_number", read_only=True)
+    driver_phone = serializers.CharField(
+        source="driver.user.phone_number", read_only=True
+    )
     driver_name = serializers.SerializerMethodField()
 
     class Meta:
         model = KYCDocument
         fields = [
-            "id", "driver", "driver_phone", "driver_name",
-            "id_card", "license", "registration",
-            "status", "feedback_note",
-            "submitted_at", "reviewed_at",
+            "id",
+            "driver",
+            "driver_phone",
+            "driver_name",
+            "id_card",
+            "license",
+            "registration",
+            "status",
+            "feedback_note",
+            "submitted_at",
+            "reviewed_at",
         ]
-        read_only_fields = ["id", "driver", "driver_phone", "driver_name", "id_card", "license", "registration", "submitted_at"]
+        read_only_fields = [
+            "id",
+            "driver",
+            "driver_phone",
+            "driver_name",
+            "id_card",
+            "license",
+            "registration",
+            "submitted_at",
+        ]
 
     def get_driver_name(self, obj):
         u = obj.driver.user
@@ -204,6 +236,11 @@ class DriverRankingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DriverRanking
-        fields = ["id", "acceptance_rate", "avg_response_time", "composite_score", "updated_at"]
+        fields = [
+            "id",
+            "acceptance_rate",
+            "avg_response_time",
+            "composite_score",
+            "updated_at",
+        ]
         read_only_fields = fields
-

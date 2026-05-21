@@ -4,9 +4,10 @@ accounts/middleware.py — JWT аутентифікація для Django Channe
 
 from urllib.parse import parse_qs
 
+from django.contrib.auth.models import AnonymousUser
+
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
-from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.tokens import AccessToken
 
 

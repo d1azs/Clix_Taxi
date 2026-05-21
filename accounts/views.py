@@ -3,8 +3,10 @@ accounts/views.py — Views для аутентифікації, реєстра�
 """
 
 import random
+
 from django.core.cache import cache
 from django.utils import timezone
+
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -32,69 +34,87 @@ from .serializers import (
 # ---------------------------------------------------------------------------
 class SendOTPView(APIView):
     """POST /api/auth/send-otp/ — Генерація та імітація відправки OTP."""
+
     permission_classes = [AllowAny]
 
     def post(self, request):
         phone = request.data.get("phone_number")
         if not phone:
-            return Response({"error": "Вкажіть phone_number"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": "Вкажіть phone_number"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
         otp = str(random.randint(1000, 9999))
-        cache.set(f"otp_{phone}", otp, timeout=300) # 5 min
-        
+        cache.set(f"otp_{phone}", otp, timeout=300)  # 5 min
+
         print(f"\n[{'*'*20}]")
         print(f" MOCK SMS TO: {phone}")
         print(f" YOUR OTP CODE: {otp}")
         print(f"[{'*'*20}]\n")
-        
-        return Response({"status": "OTP sent", "message": "Код відправлено (див. консоль сервера)"})
+
+        return Response(
+            {"status": "OTP sent", "message": "Код відправлено (див. консоль сервера)"}
+        )
 
 
 class VerifyOTPView(APIView):
     """POST /api/auth/verify-otp/ — Перевірка OTP та видача JWT."""
+
     permission_classes = [AllowAny]
 
     def post(self, request):
         phone = request.data.get("phone_number")
         otp_input = request.data.get("otp")
-        
+
         if not phone or not otp_input:
-            return Response({"error": "Необхідні phone_number та otp"}, status=status.HTTP_400_BAD_REQUEST)
-            
+            return Response(
+                {"error": "Необхідні phone_number та otp"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         cached_otp = cache.get(f"otp_{phone}")
         if not cached_otp or cached_otp != str(otp_input):
-            return Response({"error": "Невірний або прострочений код"}, status=status.HTTP_400_BAD_REQUEST)
-            
+            return Response(
+                {"error": "Невірний або прострочений код"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         cache.delete(f"otp_{phone}")
-        
+
         # Get or create user
         user, created = User.objects.get_or_create(phone_number=phone)
         if created:
             user.roles = ["PASSENGER"]
             user.set_password(str(random.randint(10000000, 99999999)))
             user.save()
-            
+
         refresh = RefreshToken.for_user(user)
         refresh["roles"] = user.roles
         refresh["phone"] = user.phone_number
         refresh["first_name"] = user.first_name
-        
+
         # KYC check for JWT
         kyc_status = "NOT_SUBMITTED"
         if user.has_role("DRIVER") and hasattr(user, "driver_profile"):
-            latest_kyc = KYCDocument.objects.filter(driver=user.driver_profile).order_by("-submitted_at").first()
+            latest_kyc = (
+                KYCDocument.objects.filter(driver=user.driver_profile)
+                .order_by("-submitted_at")
+                .first()
+            )
             if latest_kyc:
                 kyc_status = latest_kyc.status
         refresh["kyc_status"] = kyc_status
-        
-        return Response({
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
-            "user_id": str(user.id),
-            "roles": user.roles,
-            "kyc_status": kyc_status,
-            "created": created
-        })
+
+        return Response(
+            {
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+                "user_id": str(user.id),
+                "roles": user.roles,
+                "kyc_status": kyc_status,
+                "created": created,
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +146,7 @@ class MeView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
-        if self.request.method in ('PATCH', 'PUT'):
+        if self.request.method in ("PATCH", "PUT"):
             return UpdateProfileSerializer
         return UserSerializer
 
@@ -211,9 +231,7 @@ class KYCStatusView(APIView):
     def get(self, request):
         profile = request.user.driver_profile
         kyc = (
-            KYCDocument.objects.filter(driver=profile)
-            .order_by("-submitted_at")
-            .first()
+            KYCDocument.objects.filter(driver=profile).order_by("-submitted_at").first()
         )
         if not kyc:
             return Response(
@@ -331,9 +349,8 @@ class DispatcherUserSearchView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        users = User.objects.filter(
-            phone_number__icontains=phone
-        ).values("id", "phone_number", "first_name", "last_name")[:10]
+        users = User.objects.filter(phone_number__icontains=phone).values(
+            "id", "phone_number", "first_name", "last_name"
+        )[:10]
 
         return Response(list(users))
-

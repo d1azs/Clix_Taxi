@@ -6,13 +6,23 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('orders', '0001_initial'),
+        ("orders", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='order',
-            name='required_class',
-            field=models.CharField(choices=[('ECONOMY', 'Економ'), ('PREMIUM', 'Комфорт'), ('BUSINESS', 'Бізнес'), ('MINIVAN', 'Мінівен')], default='ECONOMY', max_length=10, verbose_name='Клас авто'),
+            model_name="order",
+            name="required_class",
+            field=models.CharField(
+                choices=[
+                    ("ECONOMY", "Економ"),
+                    ("PREMIUM", "Комфорт"),
+                    ("BUSINESS", "Бізнес"),
+                    ("MINIVAN", "Мінівен"),
+                ],
+                default="ECONOMY",
+                max_length=10,
+                verbose_name="Клас авто",
+            ),
         ),
     ]

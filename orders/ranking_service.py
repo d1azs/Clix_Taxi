@@ -10,6 +10,7 @@ orders/ranking_service.py — Automatic Driver Ranking Engine.
 from django.db.models import Avg, Count, Q
 
 from accounts.models import DriverProfile, DriverRanking
+
 from .models import Order, OrderStatus
 
 
@@ -19,11 +20,13 @@ def recalculate_driver_ranking(driver_profile: DriverProfile):
     Виклик: після завершення/відхилення замовлення.
     """
     # 1. Acceptance Rate — прийняті / (прийняті + відхилені)
-    total_offered = Order.objects.filter(
-        Q(driver=driver_profile) | Q(status=OrderStatus.PENDING)
-    ).filter(
-        driver=driver_profile,
-    ).count()
+    total_offered = (
+        Order.objects.filter(Q(driver=driver_profile) | Q(status=OrderStatus.PENDING))
+        .filter(
+            driver=driver_profile,
+        )
+        .count()
+    )
 
     accepted = Order.objects.filter(
         driver=driver_profile,
@@ -53,7 +56,9 @@ def recalculate_driver_ranking(driver_profile: DriverProfile):
             for o in recent_orders
             if o.accepted_at and o.created_at
         ]
-        avg_response = sum(response_times) / len(response_times) if response_times else 0
+        avg_response = (
+            sum(response_times) / len(response_times) if response_times else 0
+        )
     else:
         avg_response = 0
 
