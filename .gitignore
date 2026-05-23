@@ -45,4 +45,13 @@ landing-react/
 node_modules/
 **/node_modules/
 
+# Local simulation state
+clix_app/transfer_simulation_state.json
+
+# Local web and media folders
+dispatcher-panel/
+media/
+
+
+
 

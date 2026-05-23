@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'services/api_service.dart';
+import 'providers/transfer_simulation_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/role_selector_screen.dart';
 import 'screens/passenger/passenger_main_screen.dart';
@@ -13,13 +14,31 @@ import 'screens/driver/driver_main_screen.dart';
 import 'screens/dispatcher/dispatcher_home_screen.dart';
 import 'screens/shared/history_screen.dart';
 
+void _logToFile(String text) {
+  try {
+    final file = File('/Users/tohqa/Боско/Diploma/clix_app/app_errors.log');
+    file.writeAsStringSync(
+      '${DateTime.now().toIso8601String()} - $text\n',
+      mode: FileMode.append,
+    );
+  } catch (_) {}
+}
+
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Логування всіх помилок Flutter
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    debugPrint("CRITICAL_FLUTTER_ERROR: ${details.exception}");
-    debugPrint("CRITICAL_STACK_TRACE: ${details.stack}");
+    _logToFile("CRITICAL_FLUTTER_ERROR: ${details.exception}\n${details.stack}");
   };
+
+  // Логування асинхронних помилок поза Flutter
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    _logToFile("ASYNC_ERROR: $error\n$stack");
+    return false; // Дозволити стандартну обробку
+  };
+
   await dotenv.load(fileName: '.env');
   
   if (args.contains('--fresh')) {
@@ -34,8 +53,11 @@ class CLIXApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthProvider()..tryRestoreSession(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..tryRestoreSession()),
+        ChangeNotifierProvider(create: (_) => TransferSimulationProvider()),
+      ],
       child: MaterialApp(
         title: 'CLIX — Таксі в один клік',
         debugShowCheckedModeBanner: false,

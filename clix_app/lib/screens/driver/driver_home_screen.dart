@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/transfer_simulation_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/routing_service.dart';
 import '../../models/models.dart';
@@ -26,6 +27,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   bool _isOnline = false;
   double _todayEarnings = 0;
   int _todayTrips = 0;
+  double _driverRating = 4.9;
+  String _driverCar = 'Daewoo Lanos';
+  String _driverPlate = 'BC 1234 AA';
   List<OrderModel> _availableOrders = [];
   OrderModel? _currentOrder;
   Timer? _pollTimer;
@@ -146,6 +150,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           _todayEarnings =
               double.tryParse(data['total_earnings']?.toString() ?? '0') ?? 0;
           _todayTrips = data['total_trips'] ?? 0;
+          _driverRating = double.tryParse(data['rating']?.toString() ?? '4.9') ?? 4.9;
+          final v = data['vehicle'];
+          if (v != null) {
+            _driverCar = v['make_model'] ?? 'Daewoo Lanos';
+            _driverPlate = v['license_plate'] ?? 'BC 1234 AA';
+          }
         });
         // Відновлюємо активне замовлення (якщо було, наприклад після перемикання ролей)
         final activeOrderData = await _api.getDriverActiveOrder();
@@ -441,7 +451,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final simulation = context.watch<TransferSimulationProvider>();
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    final isSimActive = (simulation.status == 'CONFIRMED' || simulation.status == 'LIVE_RIDE') &&
+        simulation.driverPhone == auth.user?.phoneNumber;
 
     return Theme(
       data: CLIXTheme.darkTheme,
@@ -546,8 +560,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
             ),
 
             // ── Контент знизу ──
-            if (_currentOrder != null)
+            if (isSimActive)
+              _buildSimulatedActiveTripSheet(bottomPadding, simulation)
+            else if (_currentOrder != null)
               _buildActiveTripSheet(bottomPadding)
+            else if (_isOnline && simulation.status == 'PENDING' && simulation.autoAssign)
+              _buildSimulatedTransferOfferSheet(bottomPadding, simulation)
             else if (_isOnline && _availableOrders.isNotEmpty)
               _buildOrdersListSheet(bottomPadding)
             else if (_isOnline && _availableOrders.isEmpty)
@@ -1298,6 +1316,277 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         return Icons.check_circle;
     }
   }
+  // ── Симуляція: Пропозиція трансферу Booking.com (хто перший забере) ──
+  Widget _buildSimulatedTransferOfferSheet(double bottomPadding, TransferSimulationProvider simulation) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: 16 + bottomPadding, left: 16, right: 16),
+        child: Card(
+          color: CLIXTheme.driverCard,
+          elevation: 12,
+          shadowColor: Colors.black.withValues(alpha: 0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: Colors.blue.shade400, width: 2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade600,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.airport_shuttle, color: Colors.white, size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'BOOKING.COM ТРАНСФЕР',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${simulation.price.toStringAsFixed(0)} ₴',
+                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 20),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Нове замовлення! Хто перший забере',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const Divider(height: 20, color: Colors.white24),
+                Row(
+                  children: [
+                    const Icon(Icons.radio_button_checked, color: Colors.green, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        simulation.pickupAddress,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, color: Colors.red, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        simulation.dropoffAddress,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => simulation.resetSimulation(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          side: const BorderSide(color: Colors.redAccent),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          minimumSize: const Size(0, 48),
+                        ),
+                        child: const Text('Відхилити', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final auth = context.read<AuthProvider>();
+                          final name = auth.user?.fullName ?? 'Олександр Мельник';
+                          final phone = auth.user?.phoneNumber ?? '+380661234567';
+                          
+                          simulation.assignDriver(
+                            name: name,
+                            phone: phone,
+                            car: _driverCar,
+                            number: _driverPlate,
+                            rating: _driverRating,
+                          );
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('🎉 Ви успішно прийняли трансфер Booking.com!'),
+                              backgroundColor: CLIXTheme.success,
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CLIXTheme.success,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          minimumSize: const Size(0, 48),
+                        ),
+                        child: const Text(
+                          'ПРИЙНЯТИ',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Симуляція: Активний екран поїздки водія Booking.com ──
+  Widget _buildSimulatedActiveTripSheet(double bottomPadding, TransferSimulationProvider simulation) {
+    final isConfirmed = simulation.status == 'CONFIRMED';
+    final isLive = simulation.status == 'LIVE_RIDE';
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: 16 + bottomPadding, left: 16, right: 16),
+        child: Card(
+          color: CLIXTheme.driverCard,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: Colors.blue.shade400, width: 1.5),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade600,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'АКТИВНИЙ ТРАНСФЕР (BOOKING)',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${simulation.price.toStringAsFixed(0)} ₴',
+                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.blue.shade100,
+                      child: const Icon(Icons.person, color: Colors.blue),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          simulation.passengerName,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          simulation.passengerPhone,
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, color: Colors.white24),
+                if (isConfirmed)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        simulation.startRide();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Поїздку розпочато! Відкрийте карту у пасажира для відстеження.')),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CLIXTheme.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Розпочати поїздку', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  )
+                else if (isLive)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Поїздка у процесі симуляції на мапі...',
+                            style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      simulation.resetSimulation();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Трансфер скасовано.')),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      side: const BorderSide(color: Colors.redAccent),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Скасувати трансфер', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Етапи подорожі ──
@@ -1413,4 +1702,5 @@ class _DriverCarMarkerState extends State<_DriverCarMarker>
       ),
     );
   }
+
 }

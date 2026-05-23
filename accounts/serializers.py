@@ -144,6 +144,7 @@ class DriverProfileSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source="user.phone_number", read_only=True)
     first_name = serializers.CharField(source="user.first_name", read_only=True)
     last_name = serializers.CharField(source="user.last_name", read_only=True)
+    vehicle = serializers.SerializerMethodField()
 
     class Meta:
         model = DriverProfile
@@ -158,8 +159,22 @@ class DriverProfileSerializer(serializers.ModelSerializer):
             "total_earnings",
             "current_lat",
             "current_lng",
+            "vehicle",
         ]
         read_only_fields = ["id", "rating", "total_trips", "total_earnings"]
+
+    def get_vehicle(self, obj):
+        v = obj.vehicles.filter(is_active=True).first() or obj.vehicles.first()
+        if v:
+            return {
+                "id": str(v.id),
+                "make_model": v.make_model,
+                "license_plate": v.license_plate,
+                "vehicle_class": v.vehicle_class,
+                "vehicle_class_display": v.get_vehicle_class_display(),
+                "color": v.color,
+            }
+        return None
 
 
 # ---------------------------------------------------------------------------

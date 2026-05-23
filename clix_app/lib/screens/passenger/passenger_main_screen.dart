@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/transfer_simulation_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/models.dart';
+import '../shared/simulation_controls_widget.dart';
 import 'passenger_home_screen.dart';
+import 'transfer_tracking_simulation_screen.dart';
 
 /// Головний екран пасажира з нижньою навігацією.
 class PassengerMainScreen extends StatefulWidget {
@@ -27,7 +30,12 @@ class _PassengerMainScreenState extends State<PassengerMainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: Stack(
+        children: [
+          IndexedStack(index: _currentIndex, children: _pages),
+          const SimulationControlsWidget(),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -284,6 +292,9 @@ class _ScheduledPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final simulation = context.watch<TransferSimulationProvider>();
+    final hasSim = simulation.status == 'PENDING' || simulation.status == 'CONFIRMED' || simulation.status == 'LIVE_RIDE';
+
     return Scaffold(
       backgroundColor: CLIXTheme.surface,
       appBar: AppBar(
@@ -292,28 +303,354 @@ class _ScheduledPage extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      body: hasSim
+          ? SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Card(
+                elevation: 4,
+                shadowColor: Colors.blue.withValues(alpha: 0.1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(color: Colors.blue.shade200, width: 1.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Блакитний заголовок Booking.com
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade600,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.airport_shuttle, color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Трансфер Booking.com #${simulation.bookingId}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'АКТИВНИЙ',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Інформація про трансфер
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              _statusBadge(simulation.status),
+                              const Spacer(),
+                              Text(
+                                '${simulation.price.toStringAsFixed(0)} ₴',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 20,
+                                  color: CLIXTheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Маршрут
+                          _routePointTile(
+                            icon: Icons.radio_button_checked,
+                            color: CLIXTheme.success,
+                            title: 'Звідки: Аеропорт / Термінал',
+                            subtitle: simulation.pickupAddress,
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 10),
+                            child: SizedBox(
+                              height: 16,
+                              child: VerticalDivider(
+                                color: Colors.grey,
+                                thickness: 1,
+                              ),
+                            ),
+                          ),
+                          _routePointTile(
+                            icon: Icons.location_on,
+                            color: CLIXTheme.error,
+                            title: 'Куди: Місце призначення',
+                            subtitle: simulation.dropoffAddress,
+                          ),
+                          const Divider(height: 24),
+                          // Додаткові блоки
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _infoBlock(
+                                  icon: Icons.access_time,
+                                  title: 'Час подачі',
+                                  value: simulation.pickupTime,
+                                ),
+                              ),
+                              Expanded(
+                                child: _infoBlock(
+                                  icon: Icons.style,
+                                  title: 'Клас авто',
+                                  value: simulation.carClass,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (simulation.status == 'CONFIRMED' || simulation.status == 'LIVE_RIDE') ...[
+                            const Divider(height: 24),
+                            // Дані про водія
+                            const Text(
+                              'Призначений автомобіль та водій',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: CLIXTheme.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: CLIXTheme.primary.withValues(alpha: 0.1),
+                                    child: const Icon(Icons.person, color: CLIXTheme.primary),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          simulation.driverName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${simulation.carModel} • ${simulation.carNumber}',
+                                          style: const TextStyle(
+                                            color: CLIXTheme.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.star, color: Colors.amber, size: 14),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          simulation.driverRating.toStringAsFixed(1),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                            color: Colors.amber,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            // Кнопка для початку поїздки
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  simulation.startRide();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const TransferTrackingSimulationScreen(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.directions_car, color: Colors.white),
+                                label: const Text(
+                                  'Почати трансфер (Симуляція)',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: CLIXTheme.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 64,
+                    color: CLIXTheme.primary.withValues(alpha: 0.3),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Немає запланованих поїздок',
+                    style: TextStyle(color: CLIXTheme.textHint, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Тут з\'являться ваші бронювання трансферів',
+                    style: TextStyle(color: CLIXTheme.textHint, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _statusBadge(String status) {
+    Color bg = Colors.amber.shade50;
+    Color text = Colors.amber.shade800;
+    String label = 'Очікує підтвердження';
+
+    if (status == 'CONFIRMED' || status == 'LIVE_RIDE') {
+      bg = Colors.green.shade50;
+      text = Colors.green.shade800;
+      label = 'Підтверджено';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: text,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+
+  Widget _routePointTile({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: CLIXTheme.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: CLIXTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoBlock({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: CLIXTheme.surface,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: CLIXTheme.primary, size: 16),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.schedule,
-              size: 64,
-              color: CLIXTheme.primary.withValues(alpha: 0.3),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 10, color: CLIXTheme.textSecondary),
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'Немає запланованих',
-              style: TextStyle(color: CLIXTheme.textHint, fontSize: 16),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Заплановані поїздки з\'являться тут',
-              style: TextStyle(color: CLIXTheme.textHint, fontSize: 13),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: CLIXTheme.textPrimary),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }

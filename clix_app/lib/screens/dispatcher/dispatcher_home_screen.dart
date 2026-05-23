@@ -5,12 +5,14 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/transfer_simulation_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/geocoding_service.dart';
 import '../../models/models.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlong;
+import '../shared/simulation_controls_widget.dart';
 
 /// Екран диспетчера — повна CRM: замовлення, водії, KYC, статистика.
 class DispatcherHomeScreen extends StatefulWidget {
@@ -140,18 +142,23 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildOrdersTab(),
-                _buildDriversTab(),
-                _buildMapTab(),
-                _buildKycTab(),
-                _buildStatsTab(),
-              ],
-            ),
+      body: Stack(
+        children: [
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildOrdersTab(),
+                    _buildDriversTab(),
+                    _buildMapTab(),
+                    _buildKycTab(),
+                    _buildStatsTab(),
+                  ],
+                ),
+          const SimulationControlsWidget(),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateOrderDialog(context),
         backgroundColor: CLIXTheme.primary,
@@ -165,35 +172,372 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
   // TAB 1: Замовлення
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildOrdersTab() {
+    final simulation = context.watch<TransferSimulationProvider>();
+    final hasSim = simulation.status == 'PENDING' || simulation.status == 'CONFIRMED' || simulation.status == 'LIVE_RIDE';
+
     try {
-      if (_orders.isEmpty) return _emptyState(Icons.inbox_outlined, 'Замовлень ще немає');
+      if (_orders.isEmpty && !hasSim) return _emptyState(Icons.inbox_outlined, 'Замовлень ще немає');
       return RefreshIndicator(
         onRefresh: _loadData,
-        child: ListView.builder(
+        child: ListView(
           padding: const EdgeInsets.all(16),
-          itemCount: _orders.length,
-          itemBuilder: (context, i) {
-            try {
-              return _buildOrderCard(_orders[i]);
-            } catch (e, stack) {
-              debugPrint("CRITICAL_ERROR_IN_ORDER_CARD_\$i: \$e");
-              debugPrint("STACK_TRACE: \$stack");
-              return Card(
-                color: Colors.red.shade100,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text("Error rendering order card: \$e"),
-                ),
-              );
-            }
-          },
+          children: [
+            if (hasSim) ...[
+              _buildSimulatedTransferCard(simulation),
+              const SizedBox(height: 16),
+            ],
+            ..._orders.map((order) {
+              try {
+                return _buildOrderCard(order);
+              } catch (e, stack) {
+                debugPrint("CRITICAL_ERROR_IN_ORDER_CARD: $e");
+                debugPrint("STACK_TRACE: $stack");
+                return Card(
+                  color: Colors.red.shade100,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text("Error rendering order card: $e"),
+                  ),
+                );
+              }
+            }),
+          ],
         ),
       );
     } catch (e, stack) {
-      debugPrint("CRITICAL_ERROR_IN_ORDERS_TAB: \$e");
-      debugPrint("STACK_TRACE: \$stack");
-      return Center(child: Text("Error: \$e"));
+      debugPrint("CRITICAL_ERROR_IN_ORDERS_TAB: $e");
+      debugPrint("STACK_TRACE: $stack");
+      return Center(child: Text("Error: $e"));
     }
+  }
+
+  Widget _buildSimulatedTransferCard(TransferSimulationProvider simulation) {
+    final isPending = simulation.status == 'PENDING';
+    final isConfirmed = simulation.status == 'CONFIRMED';
+    final isLive = simulation.status == 'LIVE_RIDE';
+
+    return Card(
+      elevation: 4,
+      shadowColor: Colors.blue.withValues(alpha: 0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.blue.shade300, width: 1.5),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade50.withValues(alpha: 0.5), Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade600,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.airport_shuttle, color: Colors.white, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        simulation.source.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '#${simulation.bookingId}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: CLIXTheme.textPrimary),
+                ),
+                const Spacer(),
+                _statusBadge(simulation.status, _simulationStatusDisplay(simulation.status)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Icon(Icons.radio_button_checked, size: 14, color: CLIXTheme.success),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    simulation.pickupAddress,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.location_on, size: 14, color: CLIXTheme.error),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    simulation.dropoffAddress,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.person_outline, size: 12, color: CLIXTheme.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  '${simulation.passengerName} (${simulation.passengerPhone})',
+                  style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.access_time_outlined, size: 12, color: CLIXTheme.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  '${simulation.pickupTime} • Клас: ${simulation.carClass}',
+                  style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary),
+                ),
+                const Spacer(),
+                Text(
+                  '${simulation.price.toStringAsFixed(0)} ₴',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: CLIXTheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            if (isConfirmed || isLive) ...[
+              const Divider(height: 20),
+              Row(
+                children: [
+                  const Icon(Icons.directions_car, size: 14, color: CLIXTheme.success),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Призначено: ${simulation.driverName} (${simulation.carModel} — ${simulation.carNumber})',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: CLIXTheme.success,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (isPending) ...[
+              const Divider(height: 20),
+              if (simulation.autoAssign)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: CLIXTheme.primary),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Розподіл водіям (очікування прийняття)...',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: CLIXTheme.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => simulation.resetSimulation(),
+                        icon: const Icon(Icons.cancel_outlined, size: 16, color: CLIXTheme.error),
+                        label: const Text('Відхилити', style: TextStyle(fontSize: 11, color: CLIXTheme.error)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: CLIXTheme.error),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          minimumSize: const Size(0, 40),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showSimulatedForceAssignDialog(simulation),
+                        icon: const Icon(Icons.person_add_alt_1, size: 16, color: Colors.white),
+                        label: const Text('Призначити', style: TextStyle(fontSize: 11, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CLIXTheme.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          minimumSize: const Size(0, 40),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          simulation.initiateAutoAssign();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Замовлення надіслано вільним водіям!'))
+                          );
+                        },
+                        icon: const Icon(Icons.wifi, size: 16, color: Colors.white),
+                        label: const Text('Хто перший', style: TextStyle(fontSize: 11, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo.shade600,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          minimumSize: const Size(0, 40),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _simulationStatusDisplay(String status) {
+    switch (status) {
+      case 'PENDING':
+        return 'Очікує';
+      case 'CONFIRMED':
+        return 'Підтверджено';
+      case 'LIVE_RIDE':
+        return 'У дорозі';
+      default:
+        return status;
+    }
+  }
+
+  void _showSimulatedForceAssignDialog(TransferSimulationProvider simulation) {
+    final onlineDrivers = _drivers.where((d) => d['status'] == 'ONLINE').toList();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Призначити водія на трансфер Booking.com',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Оберіть водія для виконання трансферу',
+              style: TextStyle(fontSize: 13, color: CLIXTheme.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            if (onlineDrivers.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Немає водіїв онлайн.\nБудь ласка, увійдіть у роль водія в одному з вікон та увімкніть статус ONLINE.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: CLIXTheme.textSecondary),
+                  ),
+                ),
+              )
+            else
+              ...onlineDrivers.map((d) {
+                final name = '${d['first_name'] ?? ''} ${d['last_name'] ?? ''}'.trim();
+                final phone = d['phone_number'] ?? '';
+                final rating = double.tryParse(d['rating']?.toString() ?? '0') ?? 4.9;
+                
+                // Спробуємо отримати марку/номер машини водія (або заглушка)
+                final car = d['vehicle'] != null ? (d['vehicle']['make_model'] ?? 'Daewoo Lanos') : 'Daewoo Lanos';
+                final number = d['vehicle'] != null ? (d['vehicle']['license_plate'] ?? 'BC 1234 AA') : 'BC 1234 AA';
+
+                return _simulatedDriverTile(
+                  name: name.isNotEmpty ? name : phone,
+                  phone: phone,
+                  car: car,
+                  number: number,
+                  rating: rating,
+                  onSelect: () {
+                    simulation.assignDriver(
+                      name: name.isNotEmpty ? name : phone,
+                      phone: phone,
+                      car: car,
+                      number: number,
+                      rating: rating,
+                    );
+                    Navigator.pop(context);
+                  },
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _simulatedDriverTile({
+    required String name,
+    required String phone,
+    required String car,
+    required String number,
+    required double rating,
+    required VoidCallback onSelect,
+  }) {
+    return Card(
+      child: ListTile(
+        leading: const CircleAvatar(
+          backgroundColor: Color(0xFFE8F5E9),
+          child: Icon(Icons.local_taxi, color: CLIXTheme.success),
+        ),
+        title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text('$car ($number) • Рейтинг: $rating'),
+        trailing: ElevatedButton(
+          onPressed: onSelect,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: CLIXTheme.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            minimumSize: const Size(0, 36),
+          ),
+          child: const Text('Обрати', style: TextStyle(color: Colors.white, fontSize: 12)),
+        ),
+      ),
+    );
   }
 
   Widget _buildOrderCard(OrderModel order) {
@@ -274,31 +618,38 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
               Row(
                 children: [
                   // Cancel button
-                  OutlinedButton.icon(
-                    onPressed: () => _cancelOrder(order.id),
-                    icon: const Icon(Icons.cancel_outlined, size: 16, color: CLIXTheme.error),
-                    label: const Text('Скасувати',
-                        style: TextStyle(fontSize: 12, color: CLIXTheme.error)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: CLIXTheme.error),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Force-assign button
-                  if (order.status == 'PENDING')
-                    ElevatedButton.icon(
-                      onPressed: () => _showForceAssignDialog(order),
-                      icon: const Icon(Icons.person_add_alt_1, size: 16, color: Colors.white),
-                      label: const Text('Призначити водія',
-                          style: TextStyle(fontSize: 12, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CLIXTheme.primary,
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _cancelOrder(order.id),
+                      icon: const Icon(Icons.cancel_outlined, size: 16, color: CLIXTheme.error),
+                      label: const Text('Скасувати',
+                          style: TextStyle(fontSize: 12, color: CLIXTheme.error)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: CLIXTheme.error),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        minimumSize: const Size(0, 40),
                       ),
                     ),
+                  ),
+                  // Force-assign button
+                  if (order.status == 'PENDING') ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showForceAssignDialog(order),
+                        icon: const Icon(Icons.person_add_alt_1, size: 16, color: Colors.white),
+                        label: const Text('Призначити водія',
+                            style: TextStyle(fontSize: 12, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CLIXTheme.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: const Size(0, 40),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -1141,6 +1492,7 @@ class _ForceAssignSheet extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: CLIXTheme.primary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      minimumSize: const Size(0, 36),
                     ),
                     child: const Text('Обрати', style: TextStyle(color: Colors.white, fontSize: 12)),
                   ),
