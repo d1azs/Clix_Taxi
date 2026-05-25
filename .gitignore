@@ -52,6 +52,11 @@ clix_app/transfer_simulation_state.json
 dispatcher-panel/
 media/
 
+# Build outputs and locks
+clix_app.ipa
+clix_app/ios/Podfile.lock
+
+
 
 
 
