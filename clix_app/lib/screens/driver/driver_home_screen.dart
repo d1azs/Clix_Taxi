@@ -131,6 +131,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         _lastSimStatus = null;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
+            if (_currentOrder != null && _currentOrder!.passengerPhone == '+380971234567') {
+              setState(() {
+                _currentOrder = null;
+              });
+            }
             _stopSimTransfer();
             // Після завершення трансферу оновлюємо статистику
             if (wasLive) {
@@ -341,11 +346,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         final activeOrderData = await _api.getDriverActiveOrder();
         if (activeOrderData != null && mounted) {
           final order = OrderModel.fromJson(activeOrderData);
-          setState(() => _currentOrder = order);
-          _stopPolling();
-          _startTripProgress(order.status);
-          _buildOrderRoute(order);
+          if (order.passengerPhone == '+380971234567') {
+            setState(() {
+              _currentOrder = null;
+            });
+            if (_isOnline) {
+              _startPolling();
+            }
+          } else {
+            setState(() => _currentOrder = order);
+            _stopPolling();
+            _startTripProgress(order.status);
+            _buildOrderRoute(order);
+          }
         } else if (_isOnline) {
+          if (_currentOrder != null && _currentOrder!.passengerPhone == '+380971234567') {
+            setState(() {
+              _currentOrder = null;
+            });
+          }
           _startPolling();
         }
       }

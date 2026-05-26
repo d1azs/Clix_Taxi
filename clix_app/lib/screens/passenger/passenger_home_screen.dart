@@ -807,6 +807,13 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
       if (data != null && mounted) {
         final order = OrderModel.fromJson(data);
 
+        if (order.passengerPhone == '+380971234567') {
+          setState(() {
+            _activeOrder = null;
+          });
+          return;
+        }
+
         if (order.status == 'COMPLETED') {
           // Бекенд повертає COMPLETED тільки якщо відгука ще немає.
           // Не показуємо якщо:
