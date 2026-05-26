@@ -748,3 +748,61 @@ class NearbyDriversView(APIView):
             for d in drivers
         ]
         return Response(data)
+
+
+# ╔═════════════════════════════════════════════════════════════════════════╗
+# ║            СИМУЛЯЦІЯ ТРАНСФЕРУ (Transfer Simulation)                   ║
+# ╚═════════════════════════════════════════════════════════════════════════╝
+
+
+class SimulatedTransferCreateView(APIView):
+    """
+    POST /api/orders/simulated-transfer/ — Водій створює та самоприсвоює
+    замовлення для симуляції трансферу Booking.com (демо для диплому).
+    Body: {
+        "pickup_address": "...",
+        "dropoff_address": "...",
+        "pickup_lat": 49.8125,
+        "pickup_lng": 23.9561,
+        "dropoff_lat": 49.8375,
+        "dropoff_lng": 24.0326,
+        "estimated_price": 450.0,
+        "passenger_phone": "+380971234567"
+    }
+    """
+
+    permission_classes = [IsDriver]
+
+    def post(self, request):
+        driver_profile = request.user.driver_profile
+
+        pickup_address = request.data.get("pickup_address", "Аеропорт Львів")
+        dropoff_address = request.data.get("dropoff_address", "Готель Nobilis")
+        pickup_lat = request.data.get("pickup_lat", 49.8125)
+        pickup_lng = request.data.get("pickup_lng", 23.9561)
+        dropoff_lat = request.data.get("dropoff_lat", 49.8375)
+        dropoff_lng = request.data.get("dropoff_lng", 24.0326)
+        estimated_price = request.data.get("estimated_price", 450.0)
+        passenger_phone = request.data.get("passenger_phone", "+380971234567")
+
+        # Знаходимо або створюємо пасажира за номером телефону
+        passenger = User.objects.filter(phone_number=passenger_phone).first()
+
+        order = Order.objects.create(
+            passenger=passenger,
+            dispatcher=None,
+            driver=driver_profile,
+            pickup_address=pickup_address,
+            dropoff_address=dropoff_address,
+            pickup_lat=pickup_lat,
+            pickup_lng=pickup_lng,
+            dropoff_lat=dropoff_lat,
+            dropoff_lng=dropoff_lng,
+            estimated_price=estimated_price,
+            required_class="ECONOMY",
+            status=OrderStatus.ACCEPTED,
+            accepted_at=timezone.now(),
+        )
+
+        return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+

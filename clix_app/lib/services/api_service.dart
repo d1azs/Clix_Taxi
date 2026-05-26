@@ -453,4 +453,31 @@ class ApiService {
     );
     return response.data;
   }
+
+  /// Створити та самоприсвоїти замовлення для симуляції трансферу Booking.com
+  Future<Map<String, dynamic>> createSimulatedTransfer({
+    required String pickupAddress,
+    required String dropoffAddress,
+    required double pickupLat,
+    required double pickupLng,
+    required double dropoffLat,
+    required double dropoffLng,
+    required double estimatedPrice,
+    String passengerPhone = '+380971234567',
+  }) async {
+    final response = await _dio.post(
+      ApiConfig.simulatedTransfer,
+      data: {
+        'pickup_address': pickupAddress,
+        'dropoff_address': dropoffAddress,
+        'pickup_lat': pickupLat,
+        'pickup_lng': pickupLng,
+        'dropoff_lat': dropoffLat,
+        'dropoff_lng': dropoffLng,
+        'estimated_price': estimatedPrice,
+        'passenger_phone': passengerPhone,
+      },
+    );
+    return response.data;
+  }
 }

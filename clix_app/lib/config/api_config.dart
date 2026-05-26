@@ -29,6 +29,7 @@ class ApiConfig {
   static String rejectOrder(String id) => 'orders/$id/reject/';
   static String updateOrderStatus(String id) => 'orders/$id/status/';
   static String createReview(String id) => 'orders/$id/review/';
+  static const String simulatedTransfer = 'orders/simulated-transfer/';
 
   // Ендпоінти диспетчера
   static const String dispatcherCreateOrder = 'dispatcher/orders/';

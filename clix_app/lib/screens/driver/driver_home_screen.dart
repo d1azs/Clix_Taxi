@@ -28,6 +28,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   double _todayEarnings = 0;
   int _todayTrips = 0;
   double _driverRating = 4.9;
+  String? _driverProfileId;
   String _driverCar = 'Daewoo Lanos';
   String _driverPlate = 'BC 1234 AA';
   List<OrderModel> _availableOrders = [];
@@ -63,6 +64,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   List<LatLng> _demoCarWaypoints = [];
   int _demoCarIndex = 0;
   bool _demoCarActive = false;
+  String? _lastSimStatus;
 
   static const _mapStyles = [
     {
@@ -89,6 +91,161 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     );
     _loadDriverInfo();
     _initGeolocation();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final simulation = Provider.of<TransferSimulationProvider>(context);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    
+    final isSimActive = (simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED' || simulation.status == 'LIVE_RIDE') &&
+        simulation.driverPhone == auth.user?.phoneNumber;
+
+    if (isSimActive) {
+      if (_lastSimStatus != simulation.status) {
+        final oldStatus = _lastSimStatus;
+        _lastSimStatus = simulation.status;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _onSimStatusChanged(simulation.status, oldStatus, simulation);
+          }
+        });
+      }
+    } else {
+      if (_lastSimStatus != null) {
+        final wasLive = _lastSimStatus == 'LIVE_RIDE';
+        _lastSimStatus = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _stopSimTransfer();
+            // Після завершення трансферу оновлюємо статистику
+            if (wasLive) {
+              _loadDriverInfo();
+            }
+          }
+        });
+      }
+    }
+  }
+
+  void _onSimStatusChanged(String newStatus, String? oldStatus, TransferSimulationProvider simulation) {
+    if (newStatus == 'CONFIRMED') {
+      _startSimApproach(simulation);
+    } else if (newStatus == 'ARRIVED') {
+      _stopSimTransfer();
+      setState(() {
+        _demoCarLocation = simulation.routePoints.first;
+        _routePoints = simulation.routePoints;
+        _visibleRoute = List.from(simulation.routePoints);
+      });
+      simulation.updateDriverProgress(
+        lat: _demoCarLocation!.latitude,
+        lng: _demoCarLocation!.longitude,
+        index: 0,
+      );
+      _api.updateDriverLocation(_demoCarLocation!.latitude, _demoCarLocation!.longitude).catchError((_) {});
+      _fitRouteOnMap();
+    } else if (newStatus == 'LIVE_RIDE') {
+      _startSimTrip(simulation);
+    }
+  }
+
+  void _startSimApproach(TransferSimulationProvider simulation) {
+    _stopSimTransfer();
+    final waypoints = simulation.approachPoints;
+    setState(() {
+      _routePoints = waypoints;
+      _visibleRoute = List.from(waypoints);
+      _demoCarLocation = waypoints.first;
+    });
+    _fitRouteOnMap();
+
+    int index = 0;
+    simulation.updateDriverProgress(
+      lat: _demoCarLocation!.latitude,
+      lng: _demoCarLocation!.longitude,
+      index: index,
+    );
+    _api.updateDriverLocation(_demoCarLocation!.latitude, _demoCarLocation!.longitude).catchError((_) {});
+
+    _demoCarActive = true;
+    _demoCarTimer = Timer.periodic(const Duration(milliseconds: 1400), (t) {
+      if (!mounted || !_demoCarActive) {
+        t.cancel();
+        return;
+      }
+      if (index < waypoints.length - 1) {
+        index++;
+        setState(() {
+          _demoCarLocation = waypoints[index];
+          _visibleRoute = waypoints.sublist(index);
+        });
+        simulation.updateDriverProgress(
+          lat: _demoCarLocation!.latitude,
+          lng: _demoCarLocation!.longitude,
+          index: index,
+        );
+        _api.updateDriverLocation(_demoCarLocation!.latitude, _demoCarLocation!.longitude).catchError((_) {});
+      } else {
+        t.cancel();
+      }
+    });
+  }
+
+  void _startSimTrip(TransferSimulationProvider simulation) {
+    _stopSimTransfer();
+    final waypoints = simulation.routePoints;
+    setState(() {
+      _routePoints = waypoints;
+      _visibleRoute = List.from(waypoints);
+      _demoCarLocation = waypoints.first;
+    });
+    _fitRouteOnMap();
+
+    int index = 0;
+    simulation.updateDriverProgress(
+      lat: _demoCarLocation!.latitude,
+      lng: _demoCarLocation!.longitude,
+      index: index,
+    );
+    _api.updateDriverLocation(_demoCarLocation!.latitude, _demoCarLocation!.longitude).catchError((_) {});
+
+    _demoCarActive = true;
+    _demoCarTimer = Timer.periodic(const Duration(milliseconds: 1600), (t) {
+      if (!mounted || !_demoCarActive) {
+        t.cancel();
+        return;
+      }
+      if (index < waypoints.length - 1) {
+        index++;
+        setState(() {
+          _demoCarLocation = waypoints[index];
+          _visibleRoute = waypoints.sublist(index);
+        });
+        simulation.updateDriverProgress(
+          lat: _demoCarLocation!.latitude,
+          lng: _demoCarLocation!.longitude,
+          index: index,
+        );
+        _api.updateDriverLocation(_demoCarLocation!.latitude, _demoCarLocation!.longitude).catchError((_) {});
+      } else {
+        t.cancel();
+        simulation.completeRide();
+      }
+    });
+  }
+
+  void _stopSimTransfer() {
+    _demoCarTimer?.cancel();
+    _demoCarActive = false;
+    if (_currentOrder == null) {
+      setState(() {
+        _demoCarLocation = null;
+        _routePoints = [];
+        _visibleRoute = [];
+      });
+    }
   }
 
   Future<void> _initGeolocation() async {
@@ -151,6 +308,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
               double.tryParse(data['total_earnings']?.toString() ?? '0') ?? 0;
           _todayTrips = data['total_trips'] ?? 0;
           _driverRating = double.tryParse(data['rating']?.toString() ?? '4.9') ?? 4.9;
+          _driverProfileId = data['id']?.toString();
           final v = data['vehicle'];
           if (v != null) {
             _driverCar = v['make_model'] ?? 'Daewoo Lanos';
@@ -200,7 +358,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   Future<void> _toggleOnline() async {
     final newStatus = _isOnline ? 'OFFLINE' : 'ONLINE';
     try {
-      await _api.updateDriverStatus(newStatus);
+      if (newStatus == 'ONLINE') {
+        double? lat = _userLocation?.latitude;
+        double? lng = _userLocation?.longitude;
+        if (lat == null || lng == null) {
+          // Дефолтні координати Львова (Скнилівська розв'язка), щоб водій з'явився
+          lat = 49.8220;
+          lng = 23.9740;
+        }
+        await _api.updateDriverStatus(newStatus, lat: lat, lng: lng);
+      } else {
+        await _api.updateDriverStatus(newStatus);
+      }
       setState(() => _isOnline = !_isOnline);
       if (_isOnline) {
         _startPolling();
@@ -454,7 +623,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     final simulation = context.watch<TransferSimulationProvider>();
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    final isSimActive = (simulation.status == 'CONFIRMED' || simulation.status == 'LIVE_RIDE') &&
+    final isSimActive = (simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED' || simulation.status == 'LIVE_RIDE') &&
         simulation.driverPhone == auth.user?.phoneNumber;
 
     return Theme(
@@ -1426,6 +1595,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                             car: _driverCar,
                             number: _driverPlate,
                             rating: _driverRating,
+                            driverProfileId: _driverProfileId,
                           );
                           
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -1458,8 +1628,51 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
   // ── Симуляція: Активний екран поїздки водія Booking.com ──
   Widget _buildSimulatedActiveTripSheet(double bottomPadding, TransferSimulationProvider simulation) {
-    final isConfirmed = simulation.status == 'CONFIRMED';
-    final isLive = simulation.status == 'LIVE_RIDE';
+    final status = simulation.status;
+    final isConfirmed = status == 'CONFIRMED';
+    final isArrived = status == 'ARRIVED';
+    final isLive = status == 'LIVE_RIDE';
+
+    String statusLabel = '';
+    String buttonLabel = '';
+    IconData? buttonIcon;
+    VoidCallback? onButtonPressed;
+    Color buttonColor = CLIXTheme.primary;
+
+    if (isConfirmed) {
+      statusLabel = 'Водій прямує до аеропорту (Прийнято)';
+      buttonLabel = 'Я на місці';
+      buttonIcon = Icons.place;
+      onButtonPressed = () {
+        simulation.arriveAtPickup();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ви прибули в аеропорт! Очікуйте пасажира.')),
+        );
+      };
+    } else if (isArrived) {
+      statusLabel = 'Очікування посадки пасажира (Прибув)';
+      buttonLabel = 'Розпочати поїздку';
+      buttonIcon = Icons.directions_car;
+      onButtonPressed = () {
+        simulation.startRide();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Поїздку розпочато! Відкрийте карту у пасажира для відстеження.')),
+        );
+      };
+    } else if (isLive) {
+      statusLabel = 'Поїздка в процесі симуляції на мапі...';
+      buttonLabel = 'Завершити поїздку';
+      buttonIcon = Icons.check_circle;
+      buttonColor = CLIXTheme.success;
+      onButtonPressed = () {
+        simulation.completeRide();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Трансфер успішно завершено!')),
+        );
+      };
+    } else if (status == 'COMPLETED') {
+      statusLabel = 'Трансфер завершено!';
+    }
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -1499,6 +1712,42 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
+                
+                // Прогрес-бар симуляції
+                _buildSimulatedTripProgressBar(status),
+                const SizedBox(height: 16),
+
+                // Статус-опис
+                if (statusLabel.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        _PulsingStatusIcon(
+                          icon: isLive ? Icons.navigation : (isArrived ? Icons.place : Icons.check_circle),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            statusLabel,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 Row(
                   children: [
                     CircleAvatar(
@@ -1522,46 +1771,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                   ],
                 ),
                 const Divider(height: 24, color: Colors.white24),
-                if (isConfirmed)
+                if (onButtonPressed != null) ...[
                   SizedBox(
                     width: double.infinity,
                     height: 48,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        simulation.startRide();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Поїздку розпочато! Відкрийте карту у пасажира для відстеження.')),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CLIXTheme.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ElevatedButton.icon(
+                      onPressed: onButtonPressed,
+                      icon: Icon(buttonIcon, color: Colors.white, size: 20),
+                      label: Text(
+                        buttonLabel,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
-                      child: const Text('Розпочати поїздку', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  )
-                else if (isLive)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Поїздка у процесі симуляції на мапі...',
-                            style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                        ],
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: buttonColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                ],
                 SizedBox(
                   width: double.infinity,
                   height: 40,
@@ -1585,6 +1813,79 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           ),
         ),
       ),
+    );
+  }
+
+  // ── Прогрес-бар симуляції трансферу (4 етапи) ──
+  Widget _buildSimulatedTripProgressBar(String status) {
+    final stages = [
+      const _TripStage('Прийнято', 'CONFIRMED', Icons.check_circle),
+      const _TripStage('Прибув', 'ARRIVED', Icons.place),
+      const _TripStage('В дорозі', 'LIVE_RIDE', Icons.directions_car),
+      const _TripStage('Готово', 'COMPLETED', Icons.flag),
+    ];
+
+    final currentIndex = stages.indexWhere((s) => s.statusKey == status);
+    
+    double progress = 0.0;
+    if (status == 'CONFIRMED') progress = 0.25;
+    else if (status == 'ARRIVED') progress = 0.5;
+    else if (status == 'LIVE_RIDE') progress = 0.75;
+    else if (status == 'COMPLETED') progress = 1.0;
+
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.white12,
+            valueColor: const AlwaysStoppedAnimation<Color>(
+              Colors.blue,
+            ),
+            minHeight: 6,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: stages.asMap().entries.map((entry) {
+            final i = entry.key;
+            final stage = entry.value;
+            final isActive = i <= currentIndex || (status == 'COMPLETED');
+            final isCurrent = stage.statusKey == status;
+
+            return Column(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? Colors.blue.withValues(alpha: isCurrent ? 1.0 : 0.4)
+                        : Colors.white12,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    stage.icon,
+                    size: 16,
+                    color: isActive ? Colors.white : Colors.white38,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  stage.label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isActive ? Colors.white70 : Colors.white30,
+                    fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }
@@ -1703,4 +2004,68 @@ class _DriverCarMarkerState extends State<_DriverCarMarker>
     );
   }
 
+}
+
+// ── Пульсуючий індикатор статусу для водія ──
+class _PulsingStatusIcon extends StatefulWidget {
+  final IconData icon;
+  const _PulsingStatusIcon({required this.icon});
+
+  @override
+  State<_PulsingStatusIcon> createState() => _PulsingStatusIconState();
+}
+
+class _PulsingStatusIconState extends State<_PulsingStatusIcon>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+    _scale = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _scale,
+      builder: (context, child) => Transform.scale(
+        scale: _scale.value,
+        child: child,
+      ),
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.blue.withValues(alpha: 0.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withValues(alpha: 0.3),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Icon(
+          widget.icon,
+          color: Colors.blue,
+          size: 16,
+        ),
+      ),
+    );
+  }
 }

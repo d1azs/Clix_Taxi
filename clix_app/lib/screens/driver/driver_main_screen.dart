@@ -19,6 +19,8 @@ class DriverMainScreen extends StatefulWidget {
 class _DriverMainScreenState extends State<DriverMainScreen> {
   int _currentIndex = 0;
   Timer? _kycPollTimer;
+  final _historyKey = GlobalKey<_DriverHistoryPageState>();
+  final _earningsKey = GlobalKey<_DriverEarningsPageState>();
 
   @override
   void initState() {
@@ -88,8 +90,8 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
 
     final pages = [
       _getRadarPage(kycStatus),
-      const _DriverHistoryPage(),
-      const _DriverEarningsPage(),
+      _DriverHistoryPage(key: _historyKey),
+      _DriverEarningsPage(key: _earningsKey),
       const _DriverProfilePage(),
     ];
 
@@ -136,7 +138,15 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
   Widget _navItem(IconData icon, IconData activeIcon, String label, int index) {
     final isActive = _currentIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        setState(() => _currentIndex = index);
+        // Reload data when switching tabs
+        if (index == 1) {
+          _historyKey.currentState?._load();
+        } else if (index == 2) {
+          _earningsKey.currentState?._load();
+        }
+      },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -173,7 +183,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
 
 /// Історія поїздок водія
 class _DriverHistoryPage extends StatefulWidget {
-  const _DriverHistoryPage();
+  const _DriverHistoryPage({super.key});
   @override
   State<_DriverHistoryPage> createState() => _DriverHistoryPageState();
 }
@@ -359,7 +369,7 @@ class _DriverHistoryCard extends StatelessWidget {
 
 /// Сторінка заробітку
 class _DriverEarningsPage extends StatefulWidget {
-  const _DriverEarningsPage();
+  const _DriverEarningsPage({super.key});
   @override
   State<_DriverEarningsPage> createState() => _DriverEarningsPageState();
 }
@@ -368,7 +378,7 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
   final _api = ApiService();
   double _totalEarnings = 0;
   int _totalTrips = 0;
-  double _compositeScore = 0.0;
+  double _rating = 5.0;
   bool _loading = true;
 
   @override
@@ -386,10 +396,7 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
           _totalEarnings =
               double.tryParse(data['total_earnings']?.toString() ?? '0') ?? 0;
           _totalTrips = data['total_trips'] ?? 0;
-          // Нове поле з бекенду (ranking)
-          if (data['ranking'] != null) {
-            _compositeScore = double.tryParse(data['ranking']['composite_score']?.toString() ?? '0.0') ?? 0.0;
-          }
+          _rating = double.tryParse(data['rating']?.toString() ?? '5.0') ?? 5.0;
           _loading = false;
         });
       }
@@ -486,7 +493,12 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
                   Icons.trending_up,
                 ),
                 const SizedBox(width: 12),
-                _statCard('Рейтинг', '$_compositeScore / 100', Icons.analytics_outlined),
+                _statCard(
+                  'Рейтинг',
+                  '${_rating.toStringAsFixed(1)} / 5',
+                  Icons.star_rounded,
+                  iconColor: Colors.amber,
+                ),
               ],
             ),
           ],
@@ -495,7 +507,7 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
     );
   }
 
-  Widget _statCard(String title, String value, IconData icon) {
+  Widget _statCard(String title, String value, IconData icon, {Color? iconColor}) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -505,7 +517,7 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: CLIXTheme.primaryLight, size: 24),
+            Icon(icon, color: iconColor ?? CLIXTheme.primaryLight, size: 24),
             const SizedBox(height: 8),
             Text(
               title,
@@ -768,7 +780,18 @@ class _DriverProfilePage extends StatelessWidget {
     );
   }
 
-  void _showMyRatingsDialog(BuildContext context) {
+  void _showMyRatingsDialog(BuildContext context) async {
+    final api = ApiService();
+    double rating = 5.0;
+    int totalTrips = 0;
+    try {
+      final data = await api.getDriverStatus();
+      rating = double.tryParse(data['rating']?.toString() ?? '5.0') ?? 5.0;
+      totalTrips = data['total_trips'] ?? 0;
+    } catch (_) {}
+
+    if (!context.mounted) return;
+    
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -778,14 +801,38 @@ class _DriverProfilePage extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.star, size: 64, color: Colors.amber),
+            // 5 зірок з відображенням рейтингу
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(5, (i) {
+                final starVal = i + 1;
+                if (rating >= starVal) {
+                  return const Icon(Icons.star, size: 36, color: Colors.amber);
+                } else if (rating >= starVal - 0.5) {
+                  return const Icon(Icons.star_half, size: 36, color: Colors.amber);
+                } else {
+                  return Icon(Icons.star_border, size: 36, color: Colors.amber.shade200);
+                }
+              }),
+            ),
             const SizedBox(height: 12),
-            const Text(
-              'Рейтинг: 4.92',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+            Text(
+              '${rating.toStringAsFixed(2)} / 5.0',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             const SizedBox(height: 8),
-            const Text('Ви чудовий водій, так тримати!', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54)),
+            Text(
+              'На основі $totalTrips поїздок',
+              style: const TextStyle(color: Colors.white54, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              rating >= 4.5 ? 'Ви чудовий водій, так тримати!' :
+              rating >= 3.5 ? 'Гарний результат, продовжуйте!' :
+              'Покращуйте якість обслуговування',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white54),
+            ),
           ],
         ),
         actionsAlignment: MainAxisAlignment.center,

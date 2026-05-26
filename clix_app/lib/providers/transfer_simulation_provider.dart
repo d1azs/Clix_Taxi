@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import '../../services/api_service.dart';
 
 /// Провайдер стану для симуляції трансферу Booking.com.
 /// Синхронізує свій стан через локальний JSON файл для підтримки мульти-віконного режиму.
@@ -33,6 +34,14 @@ class TransferSimulationProvider extends ChangeNotifier {
   // Прапорець для авто-розподілу (хто перший забере)
   bool _autoAssign = false;
 
+  // Поточні координати водія під час руху
+  double? _driverLat;
+  double? _driverLng;
+  int _currentRouteIndex = 0;
+
+  // ID замовлення на бекенді для збереження історії та оцінки
+  String? _backendOrderId;
+
   String get status => _status;
   String get driverName => _driverName;
   String get driverPhone => _driverPhone;
@@ -42,6 +51,10 @@ class TransferSimulationProvider extends ChangeNotifier {
   int get passengerRating => _passengerRating;
   String get passengerComment => _passengerComment;
   bool get autoAssign => _autoAssign;
+  double? get driverLat => _driverLat;
+  double? get driverLng => _driverLng;
+  int get currentRouteIndex => _currentRouteIndex;
+  String? get backendOrderId => _backendOrderId;
 
   // Файл для синхронізації між процесами (вікнами)
   static const String _syncPath = '/Users/tohqa/Боско/Diploma/clix_app/transfer_simulation_state.json';
@@ -50,8 +63,8 @@ class TransferSimulationProvider extends ChangeNotifier {
 
   TransferSimulationProvider() {
     _loadStateFromFile();
-    // Періодично зчитуємо стан (кожні 1.2 секунди) для швидкої синхронізації вікон
-    _syncTimer = Timer.periodic(const Duration(milliseconds: 1200), (_) {
+    // Періодично зчитуємо стан (кожні 0.5 секунди) для швидкої синхронізації вікон
+    _syncTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!_isSaving) {
         _loadStateFromFile();
       }
@@ -79,6 +92,10 @@ class TransferSimulationProvider extends ChangeNotifier {
         'passengerRating': _passengerRating,
         'passengerComment': _passengerComment,
         'autoAssign': _autoAssign,
+        'driverLat': _driverLat,
+        'driverLng': _driverLng,
+        'currentRouteIndex': _currentRouteIndex,
+        'backendOrderId': _backendOrderId,
       };
       file.writeAsStringSync(jsonEncode(data));
     } catch (e) {
@@ -108,6 +125,10 @@ class TransferSimulationProvider extends ChangeNotifier {
       final newPassengerRating = data['passengerRating'] ?? 0;
       final newPassengerComment = data['passengerComment'] ?? '';
       final newAutoAssign = data['autoAssign'] ?? false;
+      final newDriverLat = data['driverLat'] != null ? (data['driverLat'] as num).toDouble() : null;
+      final newDriverLng = data['driverLng'] != null ? (data['driverLng'] as num).toDouble() : null;
+      final newCurrentRouteIndex = data['currentRouteIndex'] ?? 0;
+      final newBackendOrderId = data['backendOrderId'] as String?;
 
       // Перевіряємо, чи змінилися дані
       if (_status != newStatus ||
@@ -118,7 +139,11 @@ class TransferSimulationProvider extends ChangeNotifier {
           _carNumber != newCarNumber ||
           _passengerRating != newPassengerRating ||
           _passengerComment != newPassengerComment ||
-          _autoAssign != newAutoAssign) {
+          _autoAssign != newAutoAssign ||
+          _driverLat != newDriverLat ||
+          _driverLng != newDriverLng ||
+          _currentRouteIndex != newCurrentRouteIndex ||
+          _backendOrderId != newBackendOrderId) {
         
         _status = newStatus;
         _driverName = newDriverName;
@@ -129,6 +154,10 @@ class TransferSimulationProvider extends ChangeNotifier {
         _passengerRating = newPassengerRating;
         _passengerComment = newPassengerComment;
         _autoAssign = newAutoAssign;
+        _driverLat = newDriverLat;
+        _driverLng = newDriverLng;
+        _currentRouteIndex = newCurrentRouteIndex;
+        _backendOrderId = newBackendOrderId;
         
         notifyListeners();
       }
@@ -155,6 +184,24 @@ class TransferSimulationProvider extends ChangeNotifier {
     LatLng(49.8375, 24.0326), // Готель Nobilis
   ];
 
+  // Координати підходу водія до аеропорту
+  final List<LatLng> approachPoints = const [
+    LatLng(49.8220, 23.9740),
+    LatLng(49.8190, 23.9690),
+    LatLng(49.8165, 23.9630),
+    LatLng(49.8140, 23.9590),
+    LatLng(49.8125, 23.9561), // Аеропорт (pickup)
+  ];
+
+  // Оновити координати та індекс під час симуляції
+  void updateDriverProgress({required double lat, required double lng, required int index}) {
+    _driverLat = lat;
+    _driverLng = lng;
+    _currentRouteIndex = index;
+    _saveStateToFile();
+    notifyListeners();
+  }
+
   /// Ініціювати запит на трансфер (стає PENDING)
   void initiateTransfer() {
     _status = 'PENDING';
@@ -165,6 +212,9 @@ class TransferSimulationProvider extends ChangeNotifier {
     _passengerRating = 0;
     _passengerComment = '';
     _autoAssign = false;
+    _driverLat = null;
+    _driverLng = null;
+    _currentRouteIndex = 0;
     _saveStateToFile();
     notifyListeners();
   }
@@ -179,6 +229,9 @@ class TransferSimulationProvider extends ChangeNotifier {
     _passengerRating = 0;
     _passengerComment = '';
     _autoAssign = true;
+    _driverLat = null;
+    _driverLng = null;
+    _currentRouteIndex = 0;
     _saveStateToFile();
     notifyListeners();
   }
@@ -190,7 +243,34 @@ class TransferSimulationProvider extends ChangeNotifier {
     required String car,
     required String number,
     double rating = 4.9,
-  }) {
+    String? driverProfileId,
+  }) async {
+    String? orderId;
+
+    // 1. Створюємо замовлення на бекенді через спеціальний ендпоінт для симуляції
+    try {
+      final api = ApiService();
+      final orderData = await api.createSimulatedTransfer(
+        pickupAddress: pickupAddress,
+        dropoffAddress: dropoffAddress,
+        pickupLat: routePoints.first.latitude,
+        pickupLng: routePoints.first.longitude,
+        dropoffLat: routePoints.last.latitude,
+        dropoffLng: routePoints.last.longitude,
+        estimatedPrice: price,
+        passengerPhone: passengerPhone,
+      );
+      orderId = orderData['id'] as String?;
+
+      // Переводимо замовлення в EN_ROUTE (ACCEPTED → EN_ROUTE)
+      if (orderId != null) {
+        await api.updateOrderStatus(orderId, 'EN_ROUTE');
+      }
+    } catch (e) {
+      debugPrint('Error creating simulated transfer order: $e');
+    }
+
+    // 2. Лише після цього оновлюємо локальний стан, щоб уникнути race condition з іншими вікнами
     _driverName = name;
     _driverPhone = phone;
     _carModel = car;
@@ -198,37 +278,94 @@ class TransferSimulationProvider extends ChangeNotifier {
     _driverRating = rating;
     _status = 'CONFIRMED';
     _autoAssign = false; // Вимикаємо авто-розподіл, бо водія призначено
+    _driverLat = approachPoints.first.latitude;
+    _driverLng = approachPoints.first.longitude;
+    _currentRouteIndex = 0;
+    _backendOrderId = orderId;
     _saveStateToFile();
     notifyListeners();
   }
 
+  /// Позначити, що водій прибув до місця посадки (стає ARRIVED)
+  void arriveAtPickup() async {
+    if (_status == 'CONFIRMED') {
+      _status = 'ARRIVED';
+      _driverLat = routePoints.first.latitude;
+      _driverLng = routePoints.first.longitude;
+      _currentRouteIndex = 0;
+      _saveStateToFile();
+      notifyListeners();
+
+      if (_backendOrderId != null) {
+        try {
+          final api = ApiService();
+          await api.updateOrderStatus(_backendOrderId!, 'IN_PROGRESS');
+        } catch (e) {
+          debugPrint('Error updating backend order to IN_PROGRESS: $e');
+        }
+      }
+    }
+  }
+
   /// Розпочати симуляцію поїздки на мапі (стає LIVE_RIDE)
   void startRide() {
-    if (_status == 'CONFIRMED') {
+    if (_status == 'CONFIRMED' || _status == 'ARRIVED') {
       _status = 'LIVE_RIDE';
+      _driverLat = routePoints.first.latitude;
+      _driverLng = routePoints.first.longitude;
+      _currentRouteIndex = 0;
       _saveStateToFile();
       notifyListeners();
     }
   }
 
   /// Завершити симуляцію поїздки (стає COMPLETED)
-  void completeRide() {
+  void completeRide() async {
     if (_status == 'LIVE_RIDE') {
       _status = 'COMPLETED';
       _saveStateToFile();
       notifyListeners();
+
+      if (_backendOrderId != null) {
+        try {
+          final api = ApiService();
+          await api.updateOrderStatus(_backendOrderId!, 'COMPLETED');
+        } catch (e) {
+          debugPrint('Error completing backend order: $e');
+        }
+      }
     }
   }
 
   /// Оцінити трансфер та скинути до початкового стану
-  void submitReview(int rating, String comment) {
+  void submitReview(int rating, String comment) async {
     _passengerRating = rating;
     _passengerComment = comment;
+    
+    final orderId = _backendOrderId;
+
     // Одразу скидаємо в NONE після успішного збереження відгуку
     _status = 'NONE';
     _autoAssign = false;
+    _driverLat = null;
+    _driverLng = null;
+    _currentRouteIndex = 0;
+    _backendOrderId = null;
     _saveStateToFile();
     notifyListeners();
+
+    if (orderId != null) {
+      try {
+        final api = ApiService();
+        await api.createReview(
+          orderId: orderId,
+          rating: rating,
+          comment: comment,
+        );
+      } catch (e) {
+        debugPrint('Error submitting backend review: $e');
+      }
+    }
   }
 
   /// Повністю скинути симуляцію
@@ -241,6 +378,10 @@ class TransferSimulationProvider extends ChangeNotifier {
     _passengerRating = 0;
     _passengerComment = '';
     _autoAssign = false;
+    _driverLat = null;
+    _driverLng = null;
+    _currentRouteIndex = 0;
+    _backendOrderId = null;
     _saveStateToFile();
     notifyListeners();
   }

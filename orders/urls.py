@@ -125,4 +125,10 @@ urlpatterns = [
         views.PriceQuoteView.as_view(),
         name="price-quote",
     ),
+    # ── Симуляція трансферу ──
+    path(
+        "orders/simulated-transfer/",
+        views.SimulatedTransferCreateView.as_view(),
+        name="simulated-transfer-create",
+    ),
 ]
