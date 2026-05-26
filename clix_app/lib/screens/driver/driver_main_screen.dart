@@ -5,6 +5,7 @@ import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/models.dart';
+import '../../providers/transfer_simulation_provider.dart';
 import 'driver_home_screen.dart';
 import 'kyc_screen.dart'; // NEW
 
@@ -192,11 +193,25 @@ class _DriverHistoryPageState extends State<_DriverHistoryPage> {
   final _api = ApiService();
   List<OrderModel> _orders = [];
   bool _loading = true;
+  String? _lastStatus;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final status = Provider.of<TransferSimulationProvider>(context).status;
+    if (_lastStatus != status) {
+      final oldStatus = _lastStatus;
+      _lastStatus = status;
+      if (oldStatus != null && (status == 'NONE' || status == 'COMPLETED')) {
+        _load();
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -387,11 +402,25 @@ class _DriverEarningsPageState extends State<_DriverEarningsPage> {
   int _totalTrips = 0;
   double _rating = 5.0;
   bool _loading = true;
+  String? _lastStatus;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final status = Provider.of<TransferSimulationProvider>(context).status;
+    if (_lastStatus != status) {
+      final oldStatus = _lastStatus;
+      _lastStatus = status;
+      if (oldStatus != null && (status == 'NONE' || status == 'COMPLETED')) {
+        _load();
+      }
+    }
   }
 
   Future<void> _load() async {

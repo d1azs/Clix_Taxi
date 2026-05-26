@@ -29,6 +29,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   int _todayTrips = 0;
   double _driverRating = 4.9;
   String? _driverProfileId;
+  String? _lastGlobalSimStatus;
   String _driverCar = 'Skoda Octavia';
   String _driverPlate = 'BC 1234 AA';
   List<OrderModel> _availableOrders = [];
@@ -99,6 +100,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     final simulation = Provider.of<TransferSimulationProvider>(context);
     final auth = Provider.of<AuthProvider>(context, listen: false);
     
+    if (_lastGlobalSimStatus != simulation.status) {
+      final oldGlobal = _lastGlobalSimStatus;
+      _lastGlobalSimStatus = simulation.status;
+      if (simulation.status == 'NONE' && oldGlobal == 'COMPLETED') {
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          if (mounted) {
+            _loadDriverInfo();
+          }
+        });
+      }
+    }
+
     final isSimActive = (simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED' || simulation.status == 'LIVE_RIDE') &&
         simulation.driverPhone == auth.user?.phoneNumber;
 

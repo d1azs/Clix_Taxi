@@ -111,8 +111,6 @@ class _TransferTrackingSimulationScreenState extends State<TransferTrackingSimul
         setState(() {
           _arrived = true;
         });
-        // Викликаємо метод провайдера для завершення
-        context.read<TransferSimulationProvider>().completeRide();
       }
     });
   }
