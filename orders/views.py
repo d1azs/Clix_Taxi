@@ -800,6 +800,7 @@ class SimulatedTransferCreateView(APIView):
             dropoff_lng=dropoff_lng,
             estimated_price=estimated_price,
             required_class="ECONOMY",
+            pickup_time=timezone.now(),
             status=OrderStatus.ACCEPTED,
             accepted_at=timezone.now(),
         )

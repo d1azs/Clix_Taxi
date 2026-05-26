@@ -20,6 +20,10 @@ class PassengerMainScreen extends StatefulWidget {
 class _PassengerMainScreenState extends State<PassengerMainScreen> {
   int _currentIndex = 0;
 
+  void setIndex(int index) {
+    setState(() => _currentIndex = index);
+  }
+
   final _pages = const [
     PassengerHomeScreen(),
     _HistoryPage(),
@@ -214,7 +218,10 @@ class _HistoryCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(CLIXTheme.radiusFull),
                   ),
                   child: Text(
-                    order.statusDisplay,
+                    (order.pickupAddress.toLowerCase().contains('аеропорт') &&
+                            order.dropoffAddress.toLowerCase().contains('nobilis'))
+                        ? 'Трансфер (Booking.com)'
+                        : order.statusDisplay,
                     style: TextStyle(
                       color: _statusColor,
                       fontWeight: FontWeight.w600,
@@ -275,6 +282,10 @@ class _HistoryCard extends StatelessWidget {
   }
 
   Color get _statusColor {
+    if (order.pickupAddress.toLowerCase().contains('аеропорт') &&
+        order.dropoffAddress.toLowerCase().contains('nobilis')) {
+      return Colors.blue.shade600;
+    }
     switch (order.status) {
       case 'COMPLETED':
         return CLIXTheme.success;
@@ -293,7 +304,7 @@ class _ScheduledPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final simulation = context.watch<TransferSimulationProvider>();
-    final hasSim = simulation.status == 'PENDING' || simulation.status == 'CONFIRMED' || simulation.status == 'LIVE_RIDE';
+    final hasSim = simulation.status == 'PENDING' || simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED' || simulation.status == 'LIVE_RIDE';
 
     return Scaffold(
       backgroundColor: CLIXTheme.surface,
@@ -419,7 +430,7 @@ class _ScheduledPage extends StatelessWidget {
                               ),
                             ],
                           ),
-                          if (simulation.status == 'CONFIRMED' || simulation.status == 'LIVE_RIDE') ...[
+                          if (simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED' || simulation.status == 'LIVE_RIDE') ...[
                             const Divider(height: 24),
                             // Дані про водія
                             const Text(
@@ -492,24 +503,24 @@ class _ScheduledPage extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            // Кнопка для початку поїздки
+                            // Кнопка для початку/відстеження поїздки
                             SizedBox(
                               width: double.infinity,
                               height: 50,
                               child: ElevatedButton.icon(
                                 onPressed: () {
-                                  simulation.startRide();
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const TransferTrackingSimulationScreen(),
-                                    ),
-                                  );
+                                  final mainState = context.findAncestorStateOfType<_PassengerMainScreenState>();
+                                  mainState?.setIndex(0);
                                 },
-                                icon: const Icon(Icons.directions_car, color: Colors.white),
-                                label: const Text(
-                                  'Почати трансфер (Симуляція)',
-                                  style: TextStyle(
+                                icon: Icon(
+                                  simulation.status == 'LIVE_RIDE' ? Icons.directions_car : Icons.map_outlined,
+                                  color: Colors.white,
+                                ),
+                                label: Text(
+                                  simulation.status == 'LIVE_RIDE'
+                                      ? 'Відстежити поїздку'
+                                      : 'Відстежити трансфер',
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -560,10 +571,10 @@ class _ScheduledPage extends StatelessWidget {
     Color text = Colors.amber.shade800;
     String label = 'Очікує підтвердження';
 
-    if (status == 'CONFIRMED' || status == 'LIVE_RIDE') {
+    if (status == 'CONFIRMED' || status == 'ARRIVED' || status == 'LIVE_RIDE') {
       bg = Colors.green.shade50;
       text = Colors.green.shade800;
-      label = 'Підтверджено';
+      label = status == 'ARRIVED' ? 'Водій прибув' : 'Підтверджено';
     }
 
     return Container(

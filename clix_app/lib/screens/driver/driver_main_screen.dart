@@ -295,7 +295,10 @@ class _DriverHistoryCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(CLIXTheme.radiusFull),
                   ),
                   child: Text(
-                    order.statusDisplay,
+                    (order.pickupAddress.toLowerCase().contains('аеропорт') &&
+                            order.dropoffAddress.toLowerCase().contains('nobilis'))
+                        ? 'Трансфер (Booking.com)'
+                        : order.statusDisplay,
                     style: TextStyle(
                       color: _statusColor,
                       fontWeight: FontWeight.w600,
@@ -356,6 +359,10 @@ class _DriverHistoryCard extends StatelessWidget {
   }
 
   Color get _statusColor {
+    if (order.pickupAddress.toLowerCase().contains('аеропорт') &&
+        order.dropoffAddress.toLowerCase().contains('nobilis')) {
+      return Colors.lightBlueAccent;
+    }
     switch (order.status) {
       case 'COMPLETED':
         return CLIXTheme.success;

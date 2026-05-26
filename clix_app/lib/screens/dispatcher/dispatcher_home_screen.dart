@@ -173,7 +173,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildOrdersTab() {
     final simulation = context.watch<TransferSimulationProvider>();
-    final hasSim = simulation.status == 'PENDING' || simulation.status == 'CONFIRMED' || simulation.status == 'LIVE_RIDE';
+    final hasSim = simulation.status == 'PENDING' || simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED' || simulation.status == 'LIVE_RIDE';
 
     try {
       if (_orders.isEmpty && !hasSim) return _emptyState(Icons.inbox_outlined, 'Замовлень ще немає');
@@ -213,7 +213,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
 
   Widget _buildSimulatedTransferCard(TransferSimulationProvider simulation) {
     final isPending = simulation.status == 'PENDING';
-    final isConfirmed = simulation.status == 'CONFIRMED';
+    final isConfirmed = simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED';
     final isLive = simulation.status == 'LIVE_RIDE';
 
     return Card(
@@ -436,6 +436,8 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
         return 'Очікує';
       case 'CONFIRMED':
         return 'Підтверджено';
+      case 'ARRIVED':
+        return 'Прибув';
       case 'LIVE_RIDE':
         return 'У дорозі';
       default:
@@ -484,7 +486,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
                 final rating = double.tryParse(d['rating']?.toString() ?? '0') ?? 4.9;
                 
                 // Спробуємо отримати марку/номер машини водія (або заглушка)
-                final car = d['vehicle'] != null ? (d['vehicle']['make_model'] ?? 'Daewoo Lanos') : 'Daewoo Lanos';
+                final car = d['vehicle'] != null ? (d['vehicle']['make_model'] ?? 'Skoda Octavia') : 'Skoda Octavia';
                 final number = d['vehicle'] != null ? (d['vehicle']['license_plate'] ?? 'BC 1234 AA') : 'BC 1234 AA';
 
                 return _simulatedDriverTile(
@@ -500,6 +502,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen>
                       car: car,
                       number: number,
                       rating: rating,
+                      driverProfileId: d['id'] as String?,
                     );
                     Navigator.pop(context);
                   },

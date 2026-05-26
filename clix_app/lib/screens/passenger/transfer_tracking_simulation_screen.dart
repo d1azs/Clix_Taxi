@@ -45,8 +45,38 @@ class _TransferTrackingSimulationScreenState extends State<TransferTrackingSimul
   @override
   void initState() {
     super.initState();
-    // Починаємо рух машинки через 2 секунди після відкриття екрану
-    Future.delayed(const Duration(seconds: 2), _startSimulation);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final simulation = Provider.of<TransferSimulationProvider>(context);
+    
+    // Якщо статус змінився на LIVE_RIDE і симуляція ще не розпочата
+    if (simulation.status == 'LIVE_RIDE' && _timer == null && !_arrived) {
+      _startSimulation();
+    }
+    
+    // Якщо водій завершив поїздку передчасно або симуляція перейшла в COMPLETED
+    if (simulation.status == 'COMPLETED' && !_arrived) {
+      _timer?.cancel();
+      _timer = null;
+      setState(() {
+        _arrived = true;
+        _currentIndex = simulation.routePoints.length - 1;
+      });
+    }
+
+    // Якщо симуляцію скинули до NONE, закриваємо екран відстеження
+    if (simulation.status == 'NONE') {
+      _timer?.cancel();
+      _timer = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+    }
   }
 
   @override
@@ -57,12 +87,12 @@ class _TransferTrackingSimulationScreenState extends State<TransferTrackingSimul
   }
 
   void _startSimulation() {
-    if (!mounted) return;
+    if (_timer != null || !mounted) return;
     
     final simulation = context.read<TransferSimulationProvider>();
     final points = simulation.routePoints;
 
-    _timer = Timer.periodic(const Duration(milliseconds: 1400), (t) {
+    _timer = Timer.periodic(const Duration(milliseconds: 3000), (t) {
       if (!mounted) {
         t.cancel();
         return;
@@ -77,6 +107,7 @@ class _TransferTrackingSimulationScreenState extends State<TransferTrackingSimul
         _mapController.move(points[_currentIndex], 15.5);
       } else {
         t.cancel();
+        _timer = null;
         setState(() {
           _arrived = true;
         });
@@ -123,35 +154,14 @@ class _TransferTrackingSimulationScreenState extends State<TransferTrackingSimul
                   ),
                 ],
               ),
-              // Маркер автомобіля таксі
+              // Маркер автомобіля таксі (анімований)
               MarkerLayer(
                 markers: [
                   Marker(
                     point: currentPos,
-                    width: 50.0,
-                    height: 50.0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                        border: Border.all(color: Colors.blue.shade600, width: 2.5),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.local_taxi,
-                          color: Colors.black87,
-                          size: 24,
-                        ),
-                      ),
-                    ),
+                    width: 60.0,
+                    height: 60.0,
+                    child: const _PulsingTaxiMarker(),
                   ),
                 ],
               ),
@@ -275,14 +285,102 @@ class _TransferTrackingSimulationScreenState extends State<TransferTrackingSimul
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Степпер етапів трансферу
+                    Row(
+                      children: [
+                        'CONFIRMED',
+                        'ARRIVED',
+                        'LIVE_RIDE',
+                        'COMPLETED',
+                      ].asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final stageKey = entry.value;
+                        
+                        final stages = [
+                          ('CONFIRMED', 'Прийнято', Icons.check),
+                          ('ARRIVED', 'Прибув', Icons.place),
+                          ('LIVE_RIDE', 'В дорозі', Icons.navigation),
+                          ('COMPLETED', 'Завершено', Icons.flag),
+                        ];
+                        final stage = stages[idx];
+                        
+                        final statusOrder = ['PENDING', 'CONFIRMED', 'ARRIVED', 'LIVE_RIDE', 'COMPLETED'];
+                        final currentIdx = statusOrder.indexOf(simulation.status);
+                        final stageIdx = statusOrder.indexOf(stageKey);
+                        
+                        final isDone = currentIdx >= stageIdx;
+                        final isActive = simulation.status == stageKey;
+                        
+                        return Expanded(
+                          child: Column(
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                height: 3,
+                                color: isDone
+                                    ? Colors.blue.shade600
+                                    : Colors.grey.shade200,
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: isDone
+                                      ? Colors.blue.shade600
+                                      : Colors.grey.shade50,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isDone
+                                        ? Colors.blue.shade600
+                                        : Colors.grey.shade300,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Icon(
+                                  stage.$3,
+                                  size: 14,
+                                  color: isDone ? Colors.white : Colors.grey.shade400,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                stage.$2,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: isActive
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                  color: isDone
+                                      ? Colors.blue.shade700
+                                      : Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+
                     Row(
                       children: [
                         Text(
-                          _arrived ? "Ви прибули!" : "Прибуття через $etaMinutes хв",
+                          simulation.status == 'CONFIRMED'
+                              ? 'Водій прийняв замовлення'
+                              : simulation.status == 'ARRIVED'
+                                  ? 'Водій на місці (Прибув)'
+                                  : _arrived
+                                      ? 'Ви прибули!'
+                                      : 'Прибуття через $etaMinutes хв',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: _arrived ? Colors.green.shade700 : CLIXTheme.textPrimary,
+                            color: _arrived
+                                ? Colors.green.shade700
+                                : (simulation.status == 'ARRIVED'
+                                    ? Colors.teal.shade700
+                                    : CLIXTheme.textPrimary),
                           ),
                         ),
                         const Spacer(),
@@ -307,7 +405,11 @@ class _TransferTrackingSimulationScreenState extends State<TransferTrackingSimul
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            _navigationStages[_currentIndex],
+                            simulation.status == 'CONFIRMED'
+                                ? 'Водій прямує до аеропорту для вашої посадки'
+                                : simulation.status == 'ARRIVED'
+                                    ? 'Очікуємо на початок вашої поїздки'
+                                    : _navigationStages[_currentIndex],
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -466,6 +568,85 @@ class _TransferTrackingSimulationScreenState extends State<TransferTrackingSimul
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Пульсуючий маркер таксі на карті ──
+class _PulsingTaxiMarker extends StatefulWidget {
+  const _PulsingTaxiMarker();
+
+  @override
+  State<_PulsingTaxiMarker> createState() => _PulsingTaxiMarkerState();
+}
+
+class _PulsingTaxiMarkerState extends State<_PulsingTaxiMarker>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.88, end: 1.12).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) => Transform.scale(
+        scale: _pulse.value,
+        child: child,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Зовнішнє пульсуюче коло
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.blue.shade600.withValues(alpha: 0.2),
+            ),
+          ),
+          // Основний маркер
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.blue.shade600, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.shade600.withValues(alpha: 0.5),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.local_taxi,
+              color: Colors.black87,
+              size: 22,
+            ),
+          ),
         ],
       ),
     );

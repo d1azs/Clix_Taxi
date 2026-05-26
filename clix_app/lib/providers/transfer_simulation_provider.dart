@@ -246,6 +246,11 @@ class TransferSimulationProvider extends ChangeNotifier {
     String? driverProfileId,
   }) async {
     String? orderId;
+    String finalName = name;
+    String finalPhone = phone;
+    String finalCar = car;
+    String finalNumber = number;
+    double finalRating = rating;
 
     // 1. Створюємо замовлення на бекенді через спеціальний ендпоінт для симуляції
     try {
@@ -262,6 +267,22 @@ class TransferSimulationProvider extends ChangeNotifier {
       );
       orderId = orderData['id'] as String?;
 
+      final driverInfo = orderData['driver_info'] as Map<String, dynamic>?;
+      if (driverInfo != null) {
+        final String firstName = driverInfo['first_name'] ?? '';
+        final String lastName = driverInfo['last_name'] ?? '';
+        finalName = '$firstName $lastName'.trim();
+        if (finalName.isEmpty) finalName = name;
+        finalPhone = driverInfo['phone_number'] ?? phone;
+        finalRating = double.tryParse(driverInfo['rating']?.toString() ?? '') ?? rating;
+        
+        final vehicle = driverInfo['vehicle'] as Map<String, dynamic>?;
+        if (vehicle != null) {
+          finalCar = vehicle['make_model'] ?? car;
+          finalNumber = vehicle['license_plate'] ?? number;
+        }
+      }
+
       // Переводимо замовлення в EN_ROUTE (ACCEPTED → EN_ROUTE)
       if (orderId != null) {
         await api.updateOrderStatus(orderId, 'EN_ROUTE');
@@ -271,11 +292,11 @@ class TransferSimulationProvider extends ChangeNotifier {
     }
 
     // 2. Лише після цього оновлюємо локальний стан, щоб уникнути race condition з іншими вікнами
-    _driverName = name;
-    _driverPhone = phone;
-    _carModel = car;
-    _carNumber = number;
-    _driverRating = rating;
+    _driverName = finalName;
+    _driverPhone = finalPhone;
+    _carModel = finalCar;
+    _carNumber = finalNumber;
+    _driverRating = finalRating;
     _status = 'CONFIRMED';
     _autoAssign = false; // Вимикаємо авто-розподіл, бо водія призначено
     _driverLat = approachPoints.first.latitude;

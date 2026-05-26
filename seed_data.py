@@ -116,8 +116,8 @@ else:
 cars = [
     {
         "license_plate": "BC 1234 AA",
-        "make_model": "Daewoo Lanos",
-        "vehicle_class": "ECONOMY",
+        "make_model": "Skoda Octavia",
+        "vehicle_class": "PREMIUM",
         "color": "Сірий",
         "is_pet_friendly": False,
         "has_child_seat": False,
@@ -154,10 +154,13 @@ for car_data in cars:
     v, created = Vehicle.objects.get_or_create(
         license_plate=plate, defaults={"driver_profile": driver_profile, **car_data}
     )
-    if created:
-        print(f"✅ Авто: {v}")
+    if not created:
+        for key, val in car_data.items():
+            setattr(v, key, val)
+        v.save()
+        print(f"✅ Оновлено авто: {v}")
     else:
-        print(f"ℹ️  Авто вже існує: {v}")
+        print(f"✅ Створено авто: {v}")
 
 # ---------------------------------------------------------------------------
 # 3. Тестове замовлення (Львів)

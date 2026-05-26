@@ -163,6 +163,11 @@ class SimulationControlsWidget extends StatelessWidget {
         text = Colors.green.shade800;
         label = 'ПІДТВЕРДЖЕНО';
         break;
+      case 'ARRIVED':
+        bg = Colors.teal.shade50;
+        text = Colors.teal.shade800;
+        label = 'ВОДІЙ НА МІСЦІ';
+        break;
       case 'LIVE_RIDE':
         bg = Colors.purple.shade50;
         text = Colors.purple.shade800;

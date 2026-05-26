@@ -29,7 +29,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   int _todayTrips = 0;
   double _driverRating = 4.9;
   String? _driverProfileId;
-  String _driverCar = 'Daewoo Lanos';
+  String _driverCar = 'Skoda Octavia';
   String _driverPlate = 'BC 1234 AA';
   List<OrderModel> _availableOrders = [];
   OrderModel? _currentOrder;
@@ -170,7 +170,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     _api.updateDriverLocation(_demoCarLocation!.latitude, _demoCarLocation!.longitude).catchError((_) {});
 
     _demoCarActive = true;
-    _demoCarTimer = Timer.periodic(const Duration(milliseconds: 1400), (t) {
+    _demoCarTimer = Timer.periodic(const Duration(milliseconds: 3000), (t) {
       if (!mounted || !_demoCarActive) {
         t.cancel();
         return;
@@ -189,6 +189,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         _api.updateDriverLocation(_demoCarLocation!.latitude, _demoCarLocation!.longitude).catchError((_) {});
       } else {
         t.cancel();
+        simulation.arriveAtPickup();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📍 Ви прибули на місце посадки!'),
+              backgroundColor: CLIXTheme.success,
+            ),
+          );
+        }
       }
     });
   }
@@ -212,7 +221,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     _api.updateDriverLocation(_demoCarLocation!.latitude, _demoCarLocation!.longitude).catchError((_) {});
 
     _demoCarActive = true;
-    _demoCarTimer = Timer.periodic(const Duration(milliseconds: 1600), (t) {
+    _demoCarTimer = Timer.periodic(const Duration(milliseconds: 3000), (t) {
       if (!mounted || !_demoCarActive) {
         t.cancel();
         return;
@@ -311,7 +320,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           _driverProfileId = data['id']?.toString();
           final v = data['vehicle'];
           if (v != null) {
-            _driverCar = v['make_model'] ?? 'Daewoo Lanos';
+            _driverCar = v['make_model'] ?? 'Skoda Octavia';
             _driverPlate = v['license_plate'] ?? 'BC 1234 AA';
           }
         });

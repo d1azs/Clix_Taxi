@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 import 'dart:math' show cos, Random;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -8,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/transfer_simulation_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/geocoding_service.dart';
 import '../../services/pricing_service.dart';
@@ -31,6 +33,10 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   final _dropoffController = TextEditingController();
   OrderModel? _activeOrder;
   bool _isLoading = false;
+
+  // Оцінка трансферу Booking.com
+  int _transferSelectedStars = 5;
+  final TextEditingController _transferReviewController = TextEditingController();
 
   // Поллінг замовлення
   Timer? _orderTimer;
@@ -839,6 +845,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     _nearbyDriversTimer?.cancel();
     _pickupController.dispose();
     _dropoffController.dispose();
+    _transferReviewController.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -980,6 +987,8 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final simulation = context.watch<TransferSimulationProvider>();
+    final isTransferActive = (simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED' || simulation.status == 'LIVE_RIDE');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1002,123 +1011,117 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                 userAgentPackageName: 'com.clix.app',
               ),
               // ── Маршрут (polyline) ──
-              // Фаза ACCEPTED: лінія до пасажира (звужується)
-              if (_demoRouteToDriver.length >= 2)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _demoRouteToDriver,
-                      strokeWidth: 4.0,
-                      color: CLIXTheme.primary.withValues(alpha: 0.55),
-                      borderStrokeWidth: 1.5,
-                      borderColor: CLIXTheme.primary.withValues(alpha: 0.2),
-                    ),
-                  ],
-                ),
-              // Основний маршрут pickup→dropoff (зменшується по ходу IN_PROGRESS)
-              if (_visibleRoute.length >= 2 && _activeOrder != null)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _visibleRoute,
-                      strokeWidth: 5.0,
-                      color: CLIXTheme.primary,
-                      borderStrokeWidth: 2.0,
-                      borderColor: CLIXTheme.primary.withValues(alpha: 0.3),
-                    ),
-                  ],
-                )
-              else if (_routePoints.isNotEmpty && _activeOrder == null)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _routePoints,
-                      strokeWidth: 5.0,
-                      color: CLIXTheme.primary,
-                      borderStrokeWidth: 2.0,
-                      borderColor: CLIXTheme.primary.withValues(alpha: 0.3),
-                    ),
-                  ],
-                ),
+              if (isTransferActive) ...[
+                if (simulation.status == 'CONFIRMED' && simulation.approachPoints.length > simulation.currentRouteIndex)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: simulation.approachPoints.sublist(simulation.currentRouteIndex),
+                        strokeWidth: 4.0,
+                        color: Colors.blue.shade400.withValues(alpha: 0.7),
+                        borderStrokeWidth: 1.5,
+                        borderColor: Colors.blue.shade900.withValues(alpha: 0.2),
+                      ),
+                    ],
+                  )
+                else if ((simulation.status == 'ARRIVED' || simulation.status == 'LIVE_RIDE') && simulation.routePoints.length > simulation.currentRouteIndex)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: simulation.routePoints.sublist(simulation.currentRouteIndex),
+                        strokeWidth: 5.0,
+                        color: Colors.blue.shade600,
+                        borderStrokeWidth: 2.0,
+                        borderColor: Colors.blue.shade900.withValues(alpha: 0.3),
+                      ),
+                    ],
+                  )
+              ] else ...[
+                // Фаза ACCEPTED: лінія до пасажира (звужується)
+                if (_demoRouteToDriver.length >= 2)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: _demoRouteToDriver,
+                        strokeWidth: 4.0,
+                        color: CLIXTheme.primary.withValues(alpha: 0.55),
+                        borderStrokeWidth: 1.5,
+                        borderColor: CLIXTheme.primary.withValues(alpha: 0.2),
+                      ),
+                    ],
+                  ),
+                // Основний маршрут pickup→dropoff (зменшується по ходу IN_PROGRESS)
+                if (_visibleRoute.length >= 2 && _activeOrder != null)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: _visibleRoute,
+                        strokeWidth: 5.0,
+                        color: CLIXTheme.primary,
+                        borderStrokeWidth: 2.0,
+                        borderColor: CLIXTheme.primary.withValues(alpha: 0.3),
+                      ),
+                    ],
+                  )
+                else if (_routePoints.isNotEmpty && _activeOrder == null)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: _routePoints,
+                        strokeWidth: 5.0,
+                        color: CLIXTheme.primary,
+                        borderStrokeWidth: 2.0,
+                        borderColor: CLIXTheme.primary.withValues(alpha: 0.3),
+                      ),
+                    ],
+                  ),
+              ],
               MarkerLayer(
                 markers: [
-                  // Nearby drivers — показуємо коли немає активного замовлення
-                  if (_activeOrder == null)
-                    ..._nearbyDrivers.map((d) {
-                      final lat = (d['lat'] as num?)?.toDouble();
-                      final lng = (d['lng'] as num?)?.toDouble();
-                      if (lat == null || lng == null) return null;
-                      return Marker(
-                        point: LatLng(lat, lng),
-                        width: 32,
-                        height: 32,
+                  if (isTransferActive) ...[
+                    // Моя локація при активному трансфері
+                    if (_userLocation != null && simulation.status != 'LIVE_RIDE')
+                      Marker(
+                        point: _userLocation!,
+                        width: 28,
+                        height: 28,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: CLIXTheme.primary,
                             shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
+                                color: CLIXTheme.primary.withValues(alpha: 0.4),
+                                blurRadius: 8,
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.local_taxi, color: Color(0xFF5E48E8), size: 18),
-                        ),
-                      );
-                    }).whereType<Marker>(),
-                  // Моя локація — прибираємо коли вже в машині
-                  if (_userLocation != null &&
-                      _activeOrder?.status != 'IN_PROGRESS' &&
-                      _activeOrder?.status != 'EN_ROUTE')
-                    Marker(
-                      point: _userLocation!,
-                      width: 28,
-                      height: 28,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: CLIXTheme.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: CLIXTheme.primary.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                            ),
-                          ],
                         ),
                       ),
-                    ),
-                  // Маркер водія (DEMO анімація)
-                  if (_driverLocation != null)
-                    Marker(
-                      point: _driverLocation!,
-                      width: 54,
-                      height: 54,
-                      child: _DemoDriverMarker(),
-                    ),
-                  // Точка підбору — прибираємо коли водій вже взяв пасажира
-                  if (_selectedPickup != null &&
-                      _activeOrder?.status != 'IN_PROGRESS' &&
-                      _activeOrder?.status != 'EN_ROUTE')
-                    Marker(
-                      point: LatLng(_selectedPickup!.lat, _selectedPickup!.lng),
-                      width: 40,
-                      height: 40,
-                      child: const Icon(
-                        Icons.radio_button_checked,
-                        color: Color(0xFF10B981),
-                        size: 28,
+                    // Маркер водія симуляції трансферу (пульсуючий)
+                    if (simulation.driverLat != null && simulation.driverLng != null)
+                      Marker(
+                        point: LatLng(simulation.driverLat!, simulation.driverLng!),
+                        width: 60.0,
+                        height: 60.0,
+                        child: _PulsingTaxiMarker(),
                       ),
-                    ),
-                  // Точка призначення
-                  if (_selectedDropoff != null)
-                    Marker(
-                      point: LatLng(
-                        _selectedDropoff!.lat,
-                        _selectedDropoff!.lng,
+                    // Точка підбору (аеропорт)
+                    if (simulation.status == 'CONFIRMED' || simulation.status == 'ARRIVED')
+                      Marker(
+                        point: simulation.routePoints.first,
+                        width: 40,
+                        height: 40,
+                        child: const Icon(
+                          Icons.radio_button_checked,
+                          color: Color(0xFF10B981),
+                          size: 28,
+                        ),
                       ),
+                    // Точка призначення (готель)
+                    Marker(
+                      point: simulation.routePoints.last,
                       width: 40,
                       height: 40,
                       child: const Icon(
@@ -1127,6 +1130,93 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                         size: 32,
                       ),
                     ),
+                  ] else ...[
+                    // Nearby drivers — показуємо коли немає активного замовлення
+                    if (_activeOrder == null)
+                      ..._nearbyDrivers.map((d) {
+                        final lat = (d['lat'] as num?)?.toDouble();
+                        final lng = (d['lng'] as num?)?.toDouble();
+                        if (lat == null || lng == null) return null;
+                        return Marker(
+                          point: LatLng(lat, lng),
+                          width: 32,
+                          height: 32,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.local_taxi, color: Color(0xFF5E48E8), size: 18),
+                          ),
+                        );
+                      }).whereType<Marker>(),
+                    // Моя локація — прибираємо коли вже в машині
+                    if (_userLocation != null &&
+                        _activeOrder?.status != 'IN_PROGRESS' &&
+                        _activeOrder?.status != 'EN_ROUTE')
+                      Marker(
+                        point: _userLocation!,
+                        width: 28,
+                        height: 28,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: CLIXTheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: CLIXTheme.primary.withValues(alpha: 0.4),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // Маркер водія (DEMO анімація)
+                    if (_driverLocation != null)
+                      Marker(
+                        point: _driverLocation!,
+                        width: 54,
+                        height: 54,
+                        child: _DemoDriverMarker(),
+                      ),
+                    // Точка підбору — прибираємо коли водій вже взяв пасажира
+                    if (_selectedPickup != null &&
+                        _activeOrder?.status != 'IN_PROGRESS' &&
+                        _activeOrder?.status != 'EN_ROUTE')
+                      Marker(
+                        point: LatLng(_selectedPickup!.lat, _selectedPickup!.lng),
+                        width: 40,
+                        height: 40,
+                        child: const Icon(
+                          Icons.radio_button_checked,
+                          color: Color(0xFF10B981),
+                          size: 28,
+                        ),
+                      ),
+                    // Точка призначення
+                    if (_selectedDropoff != null)
+                      Marker(
+                        point: LatLng(
+                          _selectedDropoff!.lat,
+                          _selectedDropoff!.lng,
+                        ),
+                        width: 40,
+                        height: 40,
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Color(0xFFEF4444),
+                          size: 32,
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ],
@@ -1185,9 +1275,15 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
           ),
 
           // ── Bottom Sheet ──
-          _activeOrder != null
-              ? _buildActiveTripSheet()
-              : _buildNewOrderSheet(),
+          isTransferActive
+              ? _buildSimulatedTransferSheet(simulation)
+              : (_activeOrder != null
+                  ? _buildActiveTripSheet()
+                  : _buildNewOrderSheet()),
+
+          // ── Оверлей оцінки трансферу (при завершенні) ──
+          if (simulation.status == 'COMPLETED')
+            _buildTransferReviewOverlay(simulation),
         ],
       ),
     );
@@ -1930,6 +2026,435 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
     );
   }
 
+  // ── Симуляція трансферу Booking.com: нижня панель пасажира ──
+  Widget _buildSimulatedTransferSheet(TransferSimulationProvider simulation) {
+    // Етапи трансферу
+    final stages = [
+      ('CONFIRMED', 'Прийнято', Icons.check),
+      ('ARRIVED', 'Прибув', Icons.place),
+      ('LIVE_RIDE', 'В дорозі', Icons.navigation),
+      ('COMPLETED', 'Завершено', Icons.flag),
+    ];
+    final statusOrder = [
+      'CONFIRMED',
+      'ARRIVED',
+      'LIVE_RIDE',
+      'COMPLETED',
+    ];
+    final currentIdx = statusOrder.indexOf(simulation.status);
+
+    // ETA в хвилинах
+    final points = simulation.routePoints;
+    final int etaMinutes = simulation.status == 'ARRIVED'
+        ? 0
+        : simulation.status == 'CONFIRMED'
+            ? 5
+            : ((points.length - simulation.currentRouteIndex) * 1.2).ceil();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.38,
+      minChildSize: 0.15,
+      maxChildSize: 0.7,
+      snap: true,
+      snapSizes: const [0.38, 0.7],
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 20,
+                offset: Offset(0, -4),
+              ),
+            ],
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            children: [
+              // Ручка
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 14),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: CLIXTheme.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Степпер
+              Row(
+                children: stages.map((stage) {
+                  final stageIdx = statusOrder.indexOf(stage.$1);
+                  final isDone = currentIdx >= stageIdx;
+                  final isActive = simulation.status == stage.$1;
+                  return Expanded(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: 3,
+                          color: isDone ? CLIXTheme.primary : CLIXTheme.divider,
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: isDone ? CLIXTheme.primary : CLIXTheme.surface,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isDone ? CLIXTheme.primary : CLIXTheme.divider,
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            stage.$3,
+                            size: 14,
+                            color: isDone ? Colors.white : CLIXTheme.textHint,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          stage.$2,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                            color: isDone ? CLIXTheme.primary : CLIXTheme.textHint,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+
+              // ETA банер
+              Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [CLIXTheme.primary, CLIXTheme.primaryDark],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time, color: Colors.white, size: 20),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          simulation.status == 'LIVE_RIDE'
+                              ? 'Орієнтовно до призначення'
+                              : simulation.status == 'ARRIVED'
+                                  ? 'Очікуємо на початок...'
+                                  : 'Водій прямує до аеропорту',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 11,
+                          ),
+                        ),
+                        Text(
+                          simulation.status == 'ARRIVED' ? 'Я на місці' : '$etaMinutes хв.',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${simulation.price.toStringAsFixed(0)} ₴',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Картка водія
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: CLIXTheme.surface,
+                  borderRadius: BorderRadius.circular(CLIXTheme.radiusMd),
+                  border: Border.all(color: CLIXTheme.divider),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: CLIXTheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          simulation.driverName.isNotEmpty ? simulation.driverName[0].toUpperCase() : 'В',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            simulation.driverName.isNotEmpty ? simulation.driverName : 'Олександр Мельник',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, size: 13, color: Color(0xFFFBBF24)),
+                              const SizedBox(width: 3),
+                              Text(
+                                simulation.driverRating.toStringAsFixed(1),
+                                style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '• ${simulation.carModel} (${simulation.carNumber})',
+                                style: const TextStyle(fontSize: 12, color: CLIXTheme.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (simulation.driverPhone.isNotEmpty)
+                      Material(
+                        color: CLIXTheme.primary.withValues(alpha: 0.1),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () {},
+                          child: const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: Icon(Icons.phone, color: CLIXTheme.primary, size: 20),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Адреси
+              Row(
+                children: [
+                  const Icon(Icons.radio_button_checked, color: CLIXTheme.success, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      simulation.pickupAddress,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.only(left: 7),
+                child: SizedBox(
+                  width: 2,
+                  height: 20,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: CLIXTheme.divider),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.location_on, color: CLIXTheme.error, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      simulation.dropoffAddress,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── ВІКНО ОЦІНКИ ТА ВІДГУКУ ТРАНСФЕРУ (ПРИБУТТЯ) ──
+  Widget _buildTransferReviewOverlay(TransferSimulationProvider simulation) {
+    return Positioned.fill(
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+          child: Container(
+            color: Colors.black.withValues(alpha: 0.4),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Card(
+                  color: Colors.white,
+                  elevation: 12,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.done_all_rounded,
+                            color: Colors.green,
+                            size: 40,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Трансфер завершено!',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: CLIXTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ви прибули до готелю Nobilis.\nБудь ласка, оцініть поїздку з ${simulation.driverName}.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: CLIXTheme.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Вибір зірочок
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(5, (index) {
+                            final int ratingVal = index + 1;
+                            return IconButton(
+                              icon: Icon(
+                                Icons.star,
+                                size: 36,
+                                color: ratingVal <= _transferSelectedStars
+                                    ? Colors.amber
+                                    : Colors.grey.shade300,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _transferSelectedStars = ratingVal;
+                                });
+                              },
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 16),
+                        // Поле коментаря
+                        TextField(
+                          controller: _transferReviewController,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            hintText: 'Залиште свій відгук (необов\'язково)...',
+                            hintStyle: const TextStyle(fontSize: 13),
+                            fillColor: Colors.grey.shade50,
+                            filled: true,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey.shade200),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey.shade200),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                simulation.submitReview(0, '');
+                              },
+                              child: Text(
+                                'Пропустити',
+                                style: TextStyle(color: Colors.grey.shade500),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  simulation.submitReview(
+                                    _transferSelectedStars,
+                                    _transferReviewController.text.trim(),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: CLIXTheme.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Надіслати відгук',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Список підказок адрес ──
   Widget _buildSuggestionsList(
     List<AddressSuggestion> suggestions, {
@@ -2298,6 +2823,85 @@ class _DemoDriverMarkerState extends State<_DemoDriverMarker>
               Icons.directions_car,
               color: Colors.white,
               size: 20,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Пульсуючий маркер таксі на карті ──
+class _PulsingTaxiMarker extends StatefulWidget {
+  const _PulsingTaxiMarker();
+
+  @override
+  State<_PulsingTaxiMarker> createState() => _PulsingTaxiMarkerState();
+}
+
+class _PulsingTaxiMarkerState extends State<_PulsingTaxiMarker>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.88, end: 1.12).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) => Transform.scale(
+        scale: _pulse.value,
+        child: child,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Зовнішнє пульсуюче коло
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.blue.shade600.withValues(alpha: 0.2),
+            ),
+          ),
+          // Основний маркер
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.blue.shade600, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.shade600.withValues(alpha: 0.5),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.local_taxi,
+              color: Colors.black87,
+              size: 22,
             ),
           ),
         ],
